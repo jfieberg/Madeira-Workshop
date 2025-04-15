@@ -88,7 +88,7 @@ Then, either:
 - Open `Test.R` (contained in the `Organizing-Intro-Documents` subfolder), and in Rstudio, go to the File menu and select File -> Compile Report -> html
 - Or, open  `Test.rmd` or `Test.qmd` instead and compile these documents using markdown/quarto to create the same html file.
 
-Then, upload the resulting Test.hmtl file to [this google drive - still need to provide link](provide link here!)
+Then, upload the resulting Test.hmtl file to [this google drive - still need to provide link](provide link here!).
 
 
 ## Other Resources
