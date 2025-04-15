@@ -44,8 +44,9 @@ Thursday, May 22 (Day 4):
 
 Friday, May 23 (Day 5):
 
-- Discussion related to limitations of current approaches informing the perspective paper
+- Advanced state-space models (Marie Auger-Méthé)
 - Afternoon, outside speakers 
+- Wrap up discussion (next steps for the perspective paper)
 
 
 ## Getting set up before the workshop
@@ -65,14 +66,16 @@ To build packages from source, you will need additional build tools; see details
 
 ### R Packages
 
-The script `packages.R` in this `Organizing-Intro-Documents` subfolder can help you install and/or update the packages required for this workshop.  Please make sure to run it.
+<!--- This part still needs some work --->
+
+The script `packages.R` in the `Organizing-Intro-Documents` subfolder can help you install and/or update the packages required for this workshop.  Please make sure to run it.
 
 Once you install the packages needed for the workshop, please either: 
 
-- Open `Test.R` in Rstudio, then select File -> Menu -> Compile Report -> html
-- Knit/compile `Test.rmd` or `Test.qmd` to create an html file
+- Open `Test.R` (contained in the `Organizing-Intro-Documents` subfolder). Then, in Rstudio, go to the File menu and select File -> Compile Report -> html
+- Or, knit/compile `Test.rmd` or `Test.qmd` to create the same html file
 
-Then, upload the file to [this google drive - still need to provide link](provide link here!)
+Then, upload the resulting Test.hmtl file to [this google drive - still need to provide link](provide link here!)
 
  
 ## Other Resources
