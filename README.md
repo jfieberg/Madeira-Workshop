@@ -70,15 +70,29 @@ To build packages from source, you will need additional build tools; see details
 
 The script `packages.R` in the `Organizing-Intro-Documents` subfolder can help you install and/or update the packages required for this workshop.  Please make sure to run it.
 
-Once you install the packages needed for the workshop, please either: 
 
-- Open `Test.R` (contained in the `Organizing-Intro-Documents` subfolder). Then, in Rstudio, go to the File menu and select File -> Compile Report -> html
-- Or, knit/compile `Test.rmd` or `Test.qmd` to create the same html file
+
+### Download materials for this workshop.
+
+There are two options here: 
+    a. You can download the repository from https://github.com/jfieberg/Madeira-Workshop. To do so, go to the URL, click on the green `< > Code` button, and select "Download ZIP". Then, unzip the files to a known location on your computer.
+    b. If you are familiar with working with git and github, you can clone the repository instead.
+    
+
+### Final test
+
+Once you have installed the necessary packages and downloaded the course materials, open Rstudio and create a project associated with the directory holding all the workshop files. `File -> New Project`, then select `Existing directory`, find the `Madeira-Workshop` directory` on your computer and click OK.
+
+Then, either:
+
+- Open `Test.R` (contained in the `Organizing-Intro-Documents` subfolder), and in Rstudio, go to the File menu and select File -> Compile Report -> html
+- Or, open  `Test.rmd` or `Test.qmd` instead and compile these documents using markdown/quarto to create the same html file.
 
 Then, upload the resulting Test.hmtl file to [this google drive - still need to provide link](provide link here!)
 
- 
+
 ## Other Resources
+
 
 
 <!--- 
