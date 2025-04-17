@@ -1,0 +1,108 @@
+---
+title: "Madeira Workshop Test File"
+author: "Add YOUR name here!"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+format: 
+  html:
+    self-contained: true
+---
+
+
+## Set up and load packages needed for the workshop
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+
+The code below will look for the various packages that we will use during the workshop and make sure they are installed on your computer. 
+
+<!--- Please add any that are missing! --->
+
+
+```{r}
+# Install (or update) all other packages
+pkg.required <- c("amt",
+                  "sf",
+                  "tidyverse",
+                  "lubridate",
+                  "TwoStepCLogit",
+                  "glmmTMB",
+                  "tictoc",
+                  "broom",
+                  "here",
+                  "terra")
+
+
+pkg.available <- installed.packages()[, "Package"]
+
+if (!all(pkg.required %in% pkg.available)) {
+  pkg.missing <- pkg.required[!pkg.required %in% pkg.available]
+  install.packages(pkg.missing, dependencies = TRUE)
+} 
+sapply(pkg.required, require, character.only = TRUE)
+```
+ 
+
+## Short tests 
+
+<!--- Insert whatever tests you want here --->
+
+Don't worry too much about what the code is doing in these various sections (we will go over similar code during the workshop). A this point, just make sure everything runs without any errors!
+
+
+### Test of SSF methods
+
+
+Read in fisher data from the `R`esource-and-Step-Selection-Analyses/Data` subdirectory and select one individual's data for an SSF.
+```{r}
+fisherdat <- read_csv(
+  here("Resource-and-Step-Selection-Analyses/Data", "fisher_data.csv")) |>
+      dplyr::filter(id == 1465) 
+```
+
+Create  a track with an appropriate coordinate reference system.
+```{r} 
+fisher_trk <- make_track(fisherdat, x, y, t, crs = 4326) |>
+      amt::transform_coords(5070)
+```
+
+Resample the track to 10 minutes with a tolerance of 2 minutes.
+```{r}
+fisher_trk <- fisher_trk |>
+  track_resample(rate = minutes(10), tolerance = seconds(120)) 
+```
+ 
+
+Read in the landuse raster and reclassify to two categories (wet forests and other).
+
+```{r}
+landuse <- rast(
+  here("Resource-and-Step-Selection-Analyses/Data",  "landuse_study_area.tif"))
+wet_forests <- landuse %in% c(90, 95)
+names(wet_forests) <- "forest"
+```
+
+Prepare a "steps" representation of the data for fitting SSFs.
+```{r}
+#| warning: false
+#| message: false
+fisher_ssf <- fisher_trk |> 
+                 steps_by_burst() |> # steps version of the data set
+                 random_steps() |>  # random steps for fitting model
+                 extract_covariates(wet_forests) |> # extract coordinates
+                 mutate(cos_ta = cos(ta_), log_sl = log(sl_))
+```
+
+Fit SSF and look at summary output:
+```{r}
+fisherSSF <-  fit_clogit(case_ ~ forest + cos_ta + sl_ + log_sl + strata(step_id_),
+                         data = fisher_ssf)
+summary(fisherSSF)
+```
+
+## Report versions of packages
+
+```{r}
+sessionInfo()
+```
+

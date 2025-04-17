@@ -64,31 +64,31 @@ To build packages from source, you will need additional build tools; see details
 --->
 
 
-### R Packages
-
-<!--- This part still needs some work --->
-
-The script `packages.R` in the `Organizing-Intro-Documents` subfolder can help you install and/or update the packages required for this workshop.  Please make sure to run it.
-
-
-
 ### Download materials for this workshop.
 
 There are two options here: 
-    a. You can download the repository from https://github.com/jfieberg/Madeira-Workshop. To do so, go to the URL, click on the green `< > Code` button, and select "Download ZIP". Then, unzip the files to a known location on your computer.
-    b. If you are familiar with working with git and github, you can clone the repository instead.
+
+a. You can download the repository from https://github.com/jfieberg/Madeira-Workshop. To do so, go to the URL, click on the green `< > Code` button, and select "Download ZIP". Then, unzip the files to a known location on your computer.
+
+b. If you are familiar with working with git and github, you can clone the repository instead.
     
 
-### Final test
+### Install packages and run test script
 
-Once you have installed the necessary packages and downloaded the course materials, open Rstudio and create a project associated with the directory holding all the workshop files. `File -> New Project`, then select `Existing directory`, find the `Madeira-Workshop` directory` on your computer and click OK.
 
-Then, either:
+<!--- This part still needs some work  
 
-- Open `Test.R` (contained in the `Organizing-Intro-Documents` subfolder), and in Rstudio, go to the File menu and select File -> Compile Report -> html
-- Or, open  `Test.rmd` or `Test.qmd` instead and compile these documents using markdown/quarto to create the same html file.
+The script `packages.R` in the `Organizing-Intro-Documents` subfolder can help you install and/or update the packages required for this workshop.  Please make sure to run it.
+--->
 
-Then, upload the resulting Test.hmtl file to [this google drive - still need to provide link](provide link here!).
+Once you have downloaded the course materials, open Rstudio and create a project associated with the directory holding all the workshop files. `File -> New Project`, then select `Existing directory`, find the `Madeira-Workshop` directory` on your computer and click OK.
+
+Then, in Rstudio, open the `Test.qmd` file contained in the `Organizing-Intro-Documents` subfolder. Click `Render` (near the top of the screen in Rstudio).  This will:
+
+- Run the R code in the `Test.qmd` file
+- The code will install any missing packages and make sure your computer is ready to go for the workshop.
+
+If you are successful, this will create a `Test.hmtl` file in the same subdirectory (Organizing-Intro-Documents). Upload this file to [this google drive - still need to provide link](provide link here!) to demonstrate you are ready to go at the start of the workshop!
 
 
 ## Other Resources
