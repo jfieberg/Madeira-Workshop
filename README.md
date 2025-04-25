@@ -6,7 +6,7 @@ Presentations, code, and data associated with the workshop titled, Analysing ani
 
 General format:
 
-- We will cover a different topic on each day, starting at 9:00am and ending at 4:30.  
+- We will cover a different topic on each day, starting at 9:00am and ending at 4:30pm.  
 - At the end of the day, a select/volunteer group will meet to discuss how what we learned on that day may inform a broader perspective paper addressing: a) questions we want to tackle as marine scientists, b) currently available methods (and their relative accessibility to non-statisticians) for addressing these questions;  c) outstanding challenges that current methods are not fully capable of addressing.
 
 Monday, May 19 (Day 1):
