@@ -30,7 +30,8 @@ pkg.required <- c("amt",
                   "tictoc",
                   "broom",
                   "here",
-                  "terra")
+                  "terra",
+                  "moveHMM")
 
 
 pkg.available <- installed.packages()[, "Package"]
@@ -39,6 +40,11 @@ if (!all(pkg.required %in% pkg.available)) {
   pkg.missing <- pkg.required[!pkg.required %in% pkg.available]
   install.packages(pkg.missing, dependencies = TRUE)
 } 
+
+# install 'develop' version of momentuHMM
+install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"))
+
+pkg.required <- append(pkg.required,"momentuHMM")
 sapply(pkg.required, require, character.only = TRUE)
 ```
  
@@ -98,6 +104,51 @@ Fit SSF and look at summary output:
 fisherSSF <-  fit_clogit(case_ ~ forest + cos_ta + sl_ + log_sl + strata(step_id_),
                          data = fisher_ssf)
 summary(fisherSSF)
+```
+
+### Test of HMM methods
+
+Read in elk data of Morales et al. (2004) from Ecological Archives.
+```{r}
+trackData <- read.table("https://esapubs.org/archive/ecol/E085/072/elk_data.txt",sep="\t",header=TRUE)
+# remove blank rows
+trackData <- trackData[1:735,]
+```
+
+Convert locations from meters to km.
+```{r}
+trackData$Easting <- trackData$Easting/1000
+trackData$Northing <- trackData$Northing/1000
+```
+
+Prepare data for analysis and fit using moveHMM.
+```{r}
+#| warning: false
+colnames(trackData)[1] <- "ID"
+elkData <- moveHMM::prepData(trackData,type="UTM",coordNames=c("Easting","Northing"))
+
+# specify initial values for optimization
+shape <- c(1,2) # step shape (two parameters: one for each state)
+scale <- c(0.5,5) # step scale
+zeromass0 <- c(0.01,0.001) # step zero-mass (needed to account for zero step lengths)
+stepPar0 <- c(shape,scale,zeromass0)
+angleMean0 <- c(pi,0) # angle mean
+rho <- c(0.2,0.75) # angle concentration
+anglePar0 <- c(angleMean0,rho)
+
+# fit "double switch with covariates" model
+doubleSwitch1 <- moveHMM::fitHMM(data=elkData,nbStates=2,stepPar0=stepPar0,anglePar0=anglePar0,stepDist="gamma",angleDist="vm",stationary=TRUE)
+doubleSwitch1
+```
+
+Prepare data for analysis and fit using momentuHMM.
+```{r}
+#| message: false
+elkData <- momentuHMM::prepData(trackData,coordNames=c("Easting","Northing"))
+
+# fit "double switch with covariates" model
+doubleSwitch2 <- momentuHMM::fitHMM(data=elkData,nbStates=2,Par0=list(step=stepPar0,angle=anglePar0),dist=list(step="gamma",angle="vm"),estAngleMean=list(angle=TRUE),stationary=TRUE)
+doubleSwitch2
 ```
 
 ## Report versions of packages
