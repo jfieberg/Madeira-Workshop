@@ -42,7 +42,7 @@ if (!all(pkg.required %in% pkg.available)) {
 } 
 
 # install 'develop' version of momentuHMM
-install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"))
+install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"), dependencies = TRUE)
 
 pkg.required <- append(pkg.required,"momentuHMM")
 sapply(pkg.required, require, character.only = TRUE)
