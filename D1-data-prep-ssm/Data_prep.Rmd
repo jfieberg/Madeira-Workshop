@@ -1,6 +1,6 @@
 ---
 title: 'Handling the peculiarities of marine movement data' 
-author: "Marie Auger-Méthé, Fanny Dupont, Ron Togunov, Natasha Klappstein, Arturo Esquivel, Marco Gallegos Herrada, Sofia Ruiz Suarez"
+author: "Marie Auger-Méthé"
 output: 
   bookdown::html_document2:
     number_sections: true
@@ -27,27 +27,26 @@ pre.numberSource code
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Credits
+
+This tutorial uses materials that was created by the CANSSI Collaborative Research Team led by Vianey Leos Barajas and Marie Auger-Méthé. I thank Fanny Dupont, Ron Togunov, Natasha Klappstein, Arturo Esquivel, Marco Gallegos Herrada, and Sofia Ruiz Suarez for their contribution to this original material. 
+
 # Tutorial goals
 
-The goal of this tutorial is to explore ways to pre-prepare marine movement data.
+The goal of this tutorial is to explore ways to pre-prepare marine movement data. 
+The primary learning objectives are to:
 
-The primary learning objectives in this first tutorial are to:
-
-1. Regularize movement tracks that are irregular
-2. Create predicted tracks from error-prone data (e.g. Argos)
-
-- Selecting a time interval
-- Handling data gaps
+1. Regularize movement tracks that are irregular using Fastloc GPS data as an example.
+2. Create predicted tracks from error-prone data using Argos data as an example.
 
 
-# Setup
+# General setup
 
 First, let's load the packages that we will need to complete the analyses. 
 Of course you need to have them installed first.
 
 ```{r Load packages, attr.source = ".numberLines", message = FALSE, warning = FALSE}
-library(momentuHMM) # Package for fitting HMMs, builds on moveHMM
-library(raster)     # For importing and extracting raster spatial covariates
+library(momentuHMM) # Package for fitting HMMs, we use it for crawlWrap
 library(tidyverse)  # data management
 library(terra)
 library(tidyterra)
@@ -55,51 +54,53 @@ library(ggspatial)  # plot the data
 library(sf)         # spatial data processing
 library(kableExtra) # produce visually appealing tables
 library(geosphere)  # to calculate step lengths from lat/lon locations - just need it installed
-# conicfit needs to be installed for crawlwrap
+library(conicfit)   # needs to be installed for crawlWrap
+library(here)       # To help with sourcing
 ```
 
-While the `raster` package is being phased out in favour of the new `terra` package, `momentuHMM` still relies on the `raster` package to extract covariates. Therefore, for this tutorial we will still use `raster`, but we also use `terra` at times as it is most up-to-date package for rasters.
 
-Make sure to set working directory to "2_Movement_Tutorial" folder of the HMM workshop folder.
-
+We are assuming that you are working from Madeira-Workshop repository main folder, and using `here()` to help find the good directory for each files.
 We will need the functions in the following file `utility_functions.R`.
 
 ```{r load function, attr.source = ".numberLines"}
-source("utility_functions.R")
+source(here("D1-data-prep-ssm",
+            "utility_functions.R"))
 ```
 
 
-# Narwhal movement data
+# Regularising Fastloc GPS data
 
-We will analyze a dataset containing movement tracks of three narwhals tagged with Fastloc-GPS tags. The dataset was provided by Dr. Marianne Marcoux (Fisheries and Oceans, Canada). 
+## Narwhal movement data
+
+We will analyze a dataset containing movement tracks of three narwhals tagged with Fastloc-GPS tags. The dataset was provided by Dr. Marianne Marcoux (Fisheries and Oceans, Canada). Dr. Marcoux provided the data only for this tutorial, please do not use for other purposes without their consent. Contact: Marianne.Marcoux@dfo-mpo.gc.ca.
+
 For simplicity, we only examine the fastloc-GPS data from one week in August 2017. 
 
-```{r,fig.align='center',echo=F,out.width="40%"}
+![Photo by Paul Nicklen](Photos/PaulNicklen.jpeg){width="40%"}
 
-knitr::include_graphics("./Photos/PaulNicklen.jpeg")
-```
-
-
-## Import and vizualize data
-
-
-
-## Handling irregular data {#sec-narwhal-reg}
 
 First, let's import the raw Fastloc GPS narwhal data and convert the time column to an appropriate date format.
 
 ```{r import_O_tracks, warning=FALSE, attr.source = ".numberLines"}
 tracks_gps_O <- read.csv("data/tracks_fastloc_gps.csv") %>%
-  mutate(time = ymd_hms(time))
+  mutate(time = ymd_hms(time),
+         ID = factor(ID))
 ```
 
 We can have a first look at the data, to get more familiar with it.
 
-```{r look_O}
+```{r look_O, attr.source = ".numberLines"}
 head(tracks_gps_O)
 ```
 
-The data we obtain is often quite messy with some records missing information and other records duplicated. We can filter records to keep only complete location data using `!is.na(x) & !is.na(y)`. To remove duplicate records (same time, location, and location class), we will use the `lag` function from `dplyr`, which will use the value from the previous row so that we can compare to the current row.
+The columns/variables are:
+- `ID`: Individual identifier
+- `time`: time of location
+- `x`: longitude
+- `y`: latiture
+- `loc_class`: all GPS
+
+The data we obtain is often quite messy with some rows/records missing information and other records duplicated. We can filter records to keep only complete location data using `!is.na(x) & !is.na(y)`. To remove duplicate records (same time, location, and location class), we will use the `lag` function from `dplyr`, which will use the value from the previous row so that we can compare to the current row.
 
 ```{r remove_missing_or_duplicate_data, warning = FALSE, attr.source = ".numberLines"}
 tracks_gps_O <- tracks_gps_O %>% 
@@ -112,41 +113,35 @@ tracks_gps_O <- tracks_gps_O %>%
              loc_class == lag(loc_class)))
 ```
 
-Let's plot the data over the bathymetry and land layers we have imported at the beginning of the tutorial.
-
-### Preparing data with covariates
-
-To get a reference of where these narwhals are swimming, let's import a land layer.
+Let's plot the data over the bathymetry (i.e., depth of the ocean) and land layers, to get a sense of where these narwhals are swimming.
 
 ```{r import_land, results = 'hide', attr.source = ".numberLines"}
-land <- st_read("data/NorthBaffin.shp")
+land <- st_read(here("data", "NorthBaffin.shp"))
 ```
 
-To understand how to include covariates in our model, we will look at two covariates.
-
-First we will look at bathymetry (i.e., depth of the ocean).
+The raw bathymetry data used to create this raster was taken from the the GEBCO global ocean and land terrain model from https://pressbooks.bccampus.ca/ewemodel/chapter/getting-bathymetry/. Note that land values of the bathymetry layer are 0s.
 
 ```{r import_bathy, attr.source = ".numberLines"}
-bathy <- raster("data/bathy_4_narwhals.tiff")
+bathy <- rast(here("data", "bathy_4_narwhals.tiff"))
 ```
 
-The raw bathymetry data used to create this raster was taken from the the GEBCO global ocean and land terrain model from https://pressbooks.bccampus.ca/ewemodel/chapter/getting-bathymetry/. Note that land values of the bathymetry layer are 0s. Let's plot the narwhal movement data over the bathymetry and land layers.
-
+Let's plot the narwhal movement data over the bathymetry and land layers.
 
 ```{r plot_gps_O_data, warning=FALSE, attr.source = ".numberLines"}
 ggplot() +
-  geom_spatraster(data=rast(bathy)) +
+  geom_spatraster(data=bathy) +
   geom_sf(data=land, fill="beige") +
   geom_spatial_path(data = tracks_gps_O, 
-                    aes(x = x, y = y, colour=factor(ID)), crs = 4326) +
+                    aes(x = x, y = y, colour = ID), crs = 4326) +
   coord_sf(expand = FALSE)
 
 ```
 
+As we will see during the week, many analyses require that the locations are at regular time intervals, however Fastloc GPS data is often taken at irregular time intervals, since it depends on when the animal surface. When the data is irregular, there are two key decisions we must make, (1) the temporal resolution to use, and (2) how to address large data gaps.
 
-### Selecting a time interval for the HMM
+### Selecting a time interval (resolution)  {#sec-narwhal-resolution}
 
-An HMM assumes the observations are collected in discrete time and that there is no missing data in the predictor variables. When the data is irregular, there are two key decisions we must make, (1) the temporal resolution to use, and (2) how to address data gaps. The desired resolution depends predominantly on the biological question you are asking, as different behaviours and biological processes occur at different spatial and temporal scales (e.g., seasonal migration, daily movement between foraging and resting grounds, and fine scale foraging decisions). Generally, higher resolution data is preferred as it has more information. However, it is possible to have too-high of a resolution wherein information from fine-scale variability drowns out the signal from coarse-scale patterns of interest (e.g., seasonal migration). A good rule of thumb, is that you want 3-50 data points per behaviour. For behaviours spanning several hours, that roughly corresponds to a desired resolution between 2 min and 60 min.
+The desired resolution depends on the biological question you are asking, as different behaviours and biological processes occur at different spatial and temporal scales (e.g., seasonal migration, daily movement between foraging and resting grounds, and fine scale foraging decisions), and the resolution of the raw data you have. Generally, higher resolution data is preferred as it has more information. However, it is possible to have too-high of a resolution wherein information from fine-scale variability drowns out the signal from coarse-scale patterns of interest (e.g., seasonal migration). A very coarse rule of thumb, is that you want 3-50 data points per behaviour. For behaviours spanning several hours, that roughly corresponds to a desired resolution between 2 min and 60 min.
 
 First, let's calculate the time difference between successive records using `difftime` and `lead` (compares current row to following row) and place these values in a new column called `dt`. Note that the time difference is in minutes (`units = "mins"`). For the last record of each individual (i.e., when `ID != lead(ID)`), we will set the value to `NA`.
 
@@ -155,7 +150,8 @@ First, let's calculate the time difference between successive records using `dif
 tracks_gps_O <- tracks_gps_O %>%
   mutate(dt = ifelse(ID == lead(ID), # If next data row is same individual
                      # calculate time difference
-                     difftime(lead(time), time, units = "mins"), NA))
+                     difftime(lead(time), time, units = "mins"), 
+                     NA))
 ```
 
 Let's see what resolutions may be possible in the data by looking at the most frequent time gaps.
@@ -176,7 +172,7 @@ tracks_gps_O %>%
   head()
 ```
 
-We see that the most frequent time gap is $10$ min, followed by $11$, $12$, $22$, $9$ and $13$ min. We also see the majority of the gaps are $< 60$ min, however some are in excess of $600$ min. Because HMMs assume observations taken at regular time intervals, finer resolutions will contain more data gaps that would need to be interpolated. Frequent and large data gaps can be difficult to handle, especially as the number of missing data points approaches or exceeds the existing data. Let's examine the potential data structure at different resolutions for the different animals.
+We see that the most frequent time gap is $10$ min, followed by $11$, $12$, $22$, $9$ and $13$ min. We also see the majority of the gaps are $< 60$ min, however some are in excess of $600$ min. Finer resolutions will contain more data gaps. For some analyses, frequent and large data gaps can be difficult to handle, especially as the number of missing data points approaches or exceeds the existing data. Let's examine the potential data structure at different resolutions for the different animals.
 
 We can now use the function `p_na` (in the script `utility_functions.R`) to look at the proportion of NAs we would get with 10, 20, 30, and 60 min resolution.
 
@@ -196,9 +192,7 @@ tracks_gps_O %>%
 
 Here we see that the $10$ min interval, around $50\%$ of the locations would be missing. 
 
-This is a lot, but choosing finer resolutions would likely bias the results. 
-
-For this tutorial, we will use a $10$ min resolution, though in many cases we may want to be more conservative and use a 30 min resolution.
+This is a lot! In many cases, we may want to be more conservative and use a 30 min resolution.
 
 ### Handling data gaps 
 
