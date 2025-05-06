@@ -379,28 +379,29 @@ Notice how in some areas the different simulations have generally good agreement
 
 ## Gentoo movement data
 
+We have the data from 5 gentoo penguins. We load it and change the ID to a factor and the datetime into a datetime object
 
-```{r}
-gentoo_tracks <- read.csv(here("D1-data-prep-ssm", "data", "gentoo_Argos.csv"))
+```{r load_gentoo, attr.source = ".numberLines"}
+gentoo_tracks <- read.csv(
+  here("D1-data-prep-ssm", "data", "tracks_argos.csv")) %>%
+  mutate(ID = factor(ID),
+         datetime = ymd_hms(datetime))
+  
 head(gentoo_tracks)
-gentoo_tracks %>% count(Platform.ID.No.)
-gentoo_5 <- gentoo_tracks %>% 
-  subset(Platform.ID.No. %in% c(170895, 170902, 170905, 170914, 170936)) %>% 
-  dplyr::select(Platform.ID.No., 
-                Loc..date, Longitude, Latitude, Loc..quality) %>% 
-  mutate(ID = factor(Platform.ID.No.),
-    datetime = ymd_hms(Loc..date),
-    Qual = Loc..quality) %>%
-  arrange(Platform.ID.No., datetime) %>%
-  dplyr::select(ID, datetime, )
+```
 
-write.csv(gentoo_5, )
+We want to remove any row that is missing latitude or longitude data.
 
-head(gentoo_5)
+```{r clean_gentoo, attr.source = ".numberLines"}
+gentoo_tracks <- gentoo_tracks %>% 
+  filter(!is.na(Longitude) & !is.na(Latitude))
+```
 
-gentoo_5 <- gentoo_5 %>% filter(!is.na(Longitude) & !is.na(Latitude)) 
-sum(is.na(gentoo_5))
-gentoo_5_sf <- gentoo_5 %>%
+Let's make a spatial object and plot the data.
+
+```{r plot_raw_gentoo, attr.source = ".numberLines"}
+
+gentoo_sf <- gentoo_tracks %>%
   st_as_sf(coords = c("Longitude", "Latitude")) %>% # converts to an sf object
   st_set_crs(4326)
 
@@ -410,3 +411,5 @@ ggplot() +
   geom_sf(data = gentoo_5_sf, aes(col = ID)) #+
   #coord_sf(expand = FALSE)
 ```
+
+
