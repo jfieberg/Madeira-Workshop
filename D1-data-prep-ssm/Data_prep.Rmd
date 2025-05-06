@@ -48,8 +48,6 @@ Of course you need to have them installed first.
 ```{r Load packages, attr.source = ".numberLines", message = FALSE, warning = FALSE}
 library(momentuHMM) # Package for fitting HMMs, we use it for crawlWrap
 library(tidyverse)  # data management
-library(terra)
-library(tidyterra)
 library(ggspatial)  # plot the data
 library(sf)         # spatial data processing
 library(kableExtra) # produce visually appealing tables
@@ -57,8 +55,9 @@ library(geosphere)  # to calculate step lengths from lat/lon locations - just ne
 library(conicfit)   # needs to be installed for crawlWrap
 library(here)       # To help with sourcing
 library(adehabitatLT) # setNA
-library(aniMotum)   # ssm
-# install.packages("aniMotum", 
+library(terra)
+library(tidyterra)
+# install.packages("aniMotum",
 #                  repos = c("https://cloud.r-project.org",
 #                  "https://ianjonsen.r-universe.dev"),
 #                  dependencies = TRUE)
@@ -88,7 +87,7 @@ For simplicity, we only examine the fastloc-GPS data from one week in August 201
 First, let's import the raw Fastloc GPS narwhal data and convert the time column to an appropriate date format.
 
 ```{r import_O_tracks, warning=FALSE, attr.source = ".numberLines"}
-tracks_gps_O <- read.csv("data/tracks_fastloc_gps.csv") %>%
+tracks_gps_O <- read.csv(here("D1-data-prep-ssm", "data", "tracks_fastloc_gps.csv")) %>%
   mutate(time = ymd_hms(time),
          ID = factor(ID))
 ```
@@ -395,6 +394,13 @@ gentoo_tracks <- read.csv(
 head(gentoo_tracks)
 ```
 
+The columns/variables are:
+- `ID`: Individual identifier
+- `time`: time of location
+- `x`: longitude
+- `y`: latiture
+- `loc_class`: all GPS
+
 We want to remove any row that is missing latitude or longitude data.
 
 ```{r clean_gentoo, attr.source = ".numberLines"}
@@ -412,25 +418,116 @@ Here, the data are already sorted in order of ID and datetime, but this is not a
 Let's make a spatial object and plot the data.
 
 ```{r plot_raw_gentoo, attr.source = ".numberLines"}
-
 gentoo_sf <- gentoo_tracks %>%
   st_as_sf(coords = c("Longitude", "Latitude")) %>% # converts to an sf object
   st_set_crs(4326)
 
 ggplot() +
-  # geom_spatraster(data = bathy) +
-  # geom_sf(data = land, fill = "beige") +
-  geom_sf(data = gentoo_5_sf, aes(col = ID)) #+
-  #coord_sf(expand = FALSE)
+  geom_sf(data = gentoo_sf, aes(col = ID)) 
 ```
+
+Let's look at the data gaps as above.
+
+```{r gentoo_calc_dt, attr.source = ".numberLines"}
+# Calculate time difference between locations
+gentoo_tracks <- gentoo_tracks %>%
+  mutate(dt = ifelse(ID == lead(ID), # If next data row is same individual
+                     # calculate time difference
+                     difftime(lead(datetime), datetime, units = "mins"), 
+                     NA))
+```
+
+```{r gentoo_calc_track_dt, attr.source = ".numberLines", fig.width = 10, fig.height = 4}
+# Visualise time differences (all and zoomed)
+par(mfrow = c(1, 2))
+hist(gentoo_tracks$dt, 1000, main = NA, xlab = "Time difference (min)")
+hist(gentoo_tracks$dt, 1000, main = NA, xlab = "Time difference (min)",
+     xlim = c(0,100))
+```
+
+```{gentoo_dt_ts, attr.source = ".numberLines", fig.width = 10, fig.height = 4}
+ggplot() +
+  geom_line(data = gentoo_tracks, aes(x = datetime, y = dt/60)) +
+  facet_wrap(~ID) +
+  ylab("Time interval (hour)") +
+  xlab("Date")
+```
+
+```{r gentoo_calc_track_dt2, attr.source = ".numberLines", collapse=TRUE}
+# identify the most frequent dt
+gentoo_tracks %>% 
+  {table(round(.$dt))} %>% 
+  sort(decreasing = TRUE) %>% 
+  head(20)
+```
+
+We see that the most frequent time gap is $0$ min, followed by $2$, $1$, and $3$ min. But we also see a large variability. 
+
+We can now use the function `p_na` (in the script `utility_functions.R`) to look at the proportion of NAs we would get with 2hr (120 min), 4 hr (240 min), and 6 hr (360), 12 hr  (720) resolution.
+
+
+
+```{r gentoo_track_res_prop_NA, attr.source = ".numberLines"}
+dt_s <- c(2, 4, 6, 12) # hours
+# summarise track dt
+gentoo_tracks %>% 
+  group_by(ID) %>% 
+  summarise(p_NA_1 = p_na(datetime, dt_s[1]*60),    
+            p_NA_2 = p_na(datetime, dt_s[2]*60),    
+            p_NA_3 = p_na(datetime, dt_s[3]*60),  
+            p_NA_4 = p_na(datetime, dt_s[4]*60)) %>% 
+  # return formatted table
+  kable(digits = 3, 
+        col.names = c("Gentoo ID", 
+                      paste(dt_s, "h"))) %>%
+  kable_styling() %>% 
+  add_header_above(c("", "Resolution" = 4))
+```
+
+The proportions of NAs estimated here is very approximate. Worth looking further into this as its common for Argos data to have many locations in a row (i.e., clumps). 
+
+We may also want to split first. From the time series, it looks like the biggest gaps are in the order of 20 hr or more. So we are going to split at 20 hr. The function `split_at_gap` require the column name `ID` and `time`. So we reformat before.
+
+```{r gentoo_seg, attr.source = ".numberLines"}
+gentoo_tracks <- gentoo_tracks %>% rename(time = datetime)
+# Use function from utility_function.R to split data at gaps
+gentoo_split <- split_at_gap(data = gentoo_tracks, 
+                           max_gap = 20*60, 
+                           shortest_track = 20*60)
+head(gentoo_split)
+unique(gentoo_split$ID)
+```
+
+```{r gentoo_track_res_prop_NA, attr.source = ".numberLines"}
+dt_s <- c(2, 4, 6, 12) # hours
+# summarise track dt
+gentoo_split %>% 
+  group_by(ID) %>% 
+  summarise(p_NA_1 = p_na(time, dt_s[1]*60),    
+            p_NA_2 = p_na(time, dt_s[2]*60),    
+            p_NA_3 = p_na(time, dt_s[3]*60),  
+            p_NA_4 = p_na(time, dt_s[4]*60)) %>% 
+  # return formatted table
+  kable(digits = 3, 
+        col.names = c("Gentoo ID", 
+                      paste(dt_s, "h"))) %>%
+  kable_styling() %>% 
+  add_header_above(c("", "Resolution" = 4))
+```
+
+The results change when splitting, but it's still hard to find a perfect resolution.
 
 ## Fit state-space model
 
 Format the data for aniMotum. Need to have the good name and order.
 
 ```{r}
+library(aniMotum)   # ssm
+```
+
+```{r}
 gentoo_ani <- gentoo_tracks %>%
-  rename(id = ID, date = datetime, lc = Qual,
+  rename(id = ID, date = time, lc = Qual,
      lon=Longitude, lat=Latitude)
 head(gentoo_ani)
 ```
@@ -438,19 +535,49 @@ head(gentoo_ani)
 Filter out error, but return at same irregular time interval using a correlated random walk
 
 ```{r}
-gentoo_mpi <- fit_ssm(gentoo_ani, model = "crw")
+gentoo_mpi <- fit_ssm(gentoo_ani, model = "mp")
 head(gentoo_mpi)
+summary(gentoo_mpi)
+```
+
+Done individual.
+
+```{r}
+plot(gentoo_mpi, what ="fitted", type=2, ncol=2, ask = FALSE)
+```
+
+Map the behavioural persistance model.
+
+```{r}
+aniMotum::map(gentoo_mpi, what = "fitted")
+```
+
+All individual mapped.
+
+TO be able to analyse the data further or to be able to plot it yourself, you can graph the data and make it into a 
+
+```{r}
+gentoo_mpi_t <- grab(gentoo_mpi)
+head(gentoo_mpi_t)
 ```
 
 ```{r}
-plot(gentoo_mpi, what ="fitted", type=2, ask=FALSE)
+gentoo_mpi_sf <- gentoo_mpi_t %>%
+  st_as_sf(coords = c("lon", "lat")) %>% # converts to an sf object
+  st_set_crs(4326)
+
+ggplot() +
+  geom_sf(data = gentoo_mpi_sf, aes(col=g)) +
+  facet_wrap(~id)
 ```
 
 Filter and regularize
 
+Given how 
+
 ```{r}
 gentoo_mpr <- fit_ssm(gentoo_ani, model = "mp",
-                      time.step = 6)
+                      time.step = 30)
 head(gentoo_mpr)
 ```
 

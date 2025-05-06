@@ -54,13 +54,18 @@ split_at_gap <- function(data, max_gap = 60, shortest_track = 0) {
 #' @return proportion of total observations that would be missing (for chosen `res`)
 
 p_na <- function(time, res) {
-  time <- round_date(time, paste(res,"min")) # round to nearest resolution
+  if(res <= 60){
+    time <- round_date(time, paste(res,"min")) # round to nearest resolution
+  }else{
+    time <- round_date(time, paste(res/60,"hour")) # round to nearest resolution
+  }
+  
   time <- na.omit(time[time != lead(time)]) # remove duplicate time
   # calculate maximum number of locations          
   max_n_loc <- length(seq(time[1], tail(time, 1) + res*60, 
                           by = as.difftime(res, units = "mins")))
   n_NA <- max_n_loc - (length(time)+1)
-  n_NA / max_n_loc
+  return(n_NA / max_n_loc)
 }
 
 
