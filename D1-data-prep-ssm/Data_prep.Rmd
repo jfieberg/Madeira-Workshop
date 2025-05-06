@@ -228,7 +228,7 @@ track_split <- split_at_gap(data = tracks_gps_O,
 
 The new data has an updated `ID` column, where with the original ID and track segment number. The original ID is now in `ID_old`
 
-```{r segmentation, attr.source = ".numberLines"}
+```{r head_track_split, attr.source = ".numberLines"}
 head(track_split)
 ```
 
@@ -329,37 +329,41 @@ We can see now that there are NAs for some locations, and that the time is not e
 
 ### Multiple Imputation
 
-Multiple imputation works by first fitting a CTCRW model to the original data, second, drawing (i.e., simulating) a number of realisations of the position process based on the CTCRW model, third, fitting HMMs to each of the simulated realisations, and finally, pooling the estimated parameters. `momentuHMM` has several functions to implement multiple imputation. The function MIfitHMM can be used both to simulate realisations of a fitted CTCRW and fit HMMs to each one. The number of simulations is specified with `nSims`. We can simulate realisations without fitting HMMs by setting `fit = FALSE`.
+For many analyses where you need to extract covariates from the location data, it may be wise to use multiple imputation, where you create multiple tracks with a CTCRW model and extract the covariates for each of the tracks. Then you can propagate the uncertainty in other analyses.
 
-Here, let’s use first fit a CTCRW model on complete tracks (not segmented) that we fit in the tutorial to simulate 4 tracks using MIfitHMM and plot them over the original track.
+Multiple imputation works by first fitting a CTCRW model to the original data, second, drawing (i.e., simulating) a number of realisations of the position process based on the CTCRW model, third (not done here), fitting your model of interest to each of the simulated realisations, and finally, pooling the estimated parameters. `momentuHMM` has several functions to implement multiple imputation. The function `MIfitHMM` can be used both to simulate realisations of a fitted CTCRW and fit hidden Markov model (HMMs) to each one. The number of simulations is specified with `nSims`. We can simulate realisations without fitting HMMs by setting `fit = FALSE`.
 
-```{r MI, attr.source = ".numberLines"}
+Here, let’s use first fit a CTCRW model on segmented tracks created above. We will simulate 4 tracks using MIfitHMM.
+
+```{r MI, attr.source = ".numberLines", warning=FALSE, message=FALSE}
 set.seed(12)
 
-# transform the tracks into an sf object
-tracks_gps_sf_O <- tracks_gps_O %>%
-  st_as_sf(coords = c("x", "y")) %>% # converts to an sf object
-  st_set_crs(4326) %>% # define CRS
-  st_transform(2962) # reproject data to a UTM
+# Fit the correlated random walk, MIfitHMM takes a crwData object
+crw_gps_30 <- crawlWrap(obsData = track_split_sf, timeStep = "30 mins")
 
-#Fit the correlated random walk, MIfithmm takes a crwData object
-crw_gps_10 <- crawlWrap(obsData = tracks_gps_sf_O, timeStep = "10 mins")
+# simulate 4 realisations of the 30 min GPS CTCRW model
+MI_sim_gps <- MIfitHMM(crw_gps_30, nSims = 4, fit = FALSE)
+```
 
-# simulate 4 realisations of the 10 min GPS CTCRW model
-MI_sim_gps <- MIfitHMM(crw_gps_10, nSims = 4, fit = FALSE)
+This will return warning messages. They are not shown here, but one should look at the segments that resulted in warning messages. This can potentially be fixed by forcing longer track segments above.
 
+Let's look at one segment: `T172066-6`.
+
+```{r MI_peak, attr.source = ".numberLines", warning=FALSE, message=FALSE}
+ID_seg <- "T172066-6"
 # plot locations for first narwhal
 # filter first ID from original data
-track <- tracks_gps_sf_O %>% 
-  mutate(x = st_coordinates(tracks_gps_sf_O)[,"X"], 
-         y = st_coordinates(tracks_gps_sf_O)[,"Y"]) %>% 
-  filter(ID == "T172062")
+track_eg <- track_split_sf %>% 
+  mutate(x = st_coordinates(track_split_sf)[,"X"], 
+         y = st_coordinates(track_split_sf)[,"Y"]) %>% 
+  filter(ID == ID_seg)
+
 # filter first ID for each simulation
 sim_tracks <- lapply(MI_sim_gps$miData, function(x){
-  filter(x, ID == "T172062")})
+  filter(x, ID == ID_seg)})
 
 # plot original track for first narwhal
-plot(track$x, track$y, col = "red", xlab = "x", ylab = "y", asp = 1, type = "l")
+plot(track_eg$x, track_eg$y, col = "red", xlab = "x", ylab = "y", asp = 1, type = "l")
 
 # plot each simulated track
 mute <- mapply(function(data, col) {
