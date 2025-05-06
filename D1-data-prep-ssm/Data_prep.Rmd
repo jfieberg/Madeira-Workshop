@@ -139,7 +139,7 @@ ggplot() +
 
 As we will see during the week, many analyses require that the locations are at regular time intervals, however Fastloc GPS data is often taken at irregular time intervals, since it depends on when the animal surface. When the data is irregular, there are two key decisions we must make, (1) the temporal resolution to use, and (2) how to address large data gaps.
 
-### Selecting a time interval (resolution)  {#sec-narwhal-resolution}
+### Selecting a time interval (resolution) {#sec-narwhal-resolution}
 
 The desired resolution depends on the biological question you are asking, as different behaviours and biological processes occur at different spatial and temporal scales (e.g., seasonal migration, daily movement between foraging and resting grounds, and fine scale foraging decisions), and the resolution of the raw data you have. Generally, higher resolution data is preferred as it has more information. However, it is possible to have too-high of a resolution wherein information from fine-scale variability drowns out the signal from coarse-scale patterns of interest (e.g., seasonal migration). A very coarse rule of thumb, is that you want 3-50 data points per behaviour. For behaviours spanning several hours, that roughly corresponds to a desired resolution between 2 min and 60 min.
 
@@ -192,9 +192,9 @@ tracks_gps_O %>%
 
 Here we see that the $10$ min interval, around $50\%$ of the locations would be missing. 
 
-This is a lot! In many cases, we may want to be more conservative and use a 30 min resolution.
+This is a lot! In many cases, we may want to be more conservative and use a $30$ min resolution or $60$ min resolution.
 
-### Handling data gaps 
+### Handling data gaps {#sec-narwhal-gaps}
 
 There are several ways to deal with data gaps:
 
@@ -203,31 +203,49 @@ There are several ways to deal with data gaps:
 3. Fill the gaps with NAs
 4. Multiple imputation
 
-
-To create the data used in this  tutorial, we combined options 1 and 2. The basic steps are:
-
-1. Splitting tracks
-2. Interpolating locations within each track segment
+The method to use will depend on the main analysis you are interested in.
 
 ### Splitting tracks
 
 One way to account for missing data is to split the track where there are large gaps (i.e., assign each track segment a new individual ID). 
 This strategy is particularly appropriate when you have long enough gaps for which interpolation method are unlikely to perform well. 
-We can split the tracks when the gaps larger than a predetermined threshold by iterating the ID column. 
+We can split the tracks when the gaps larger than a predetermined threshold.
+
 Here, we will use a function (found in `utility_functions.R`) to split the tracks. 
 We define the maximum allowable gap (at which point it will start a new segment), as well as the shortest allowable track segment. 
 
 These are somewhat arbitrary decisions, and depend on your subsequent choices for regularisation. In this tutorial, we will be interpolating missing locations (within each segment) and so we only want to allow gaps that can reasonably be predicted. 
-We're using a 10-minute resolution, so we allow a 60 minute gap (i.e., we assume we can predict 6 missing locations), and we want each segment to be at least 20 locations long so that we have enough information about state transitions.
+
+We are using a 30 min resolution, so we allow a 90 minute gap (i.e., we assume we can predict 2 missing locations), and we want each segment to be at least 120 min (i.e., have at least 5 locations)  long so that we have enough information about state transitions.
 
 ```{r segmentation, attr.source = ".numberLines"}
-# Use function from utility_function.R to split data at gaps > 2 hours
+# Use function from utility_function.R to split data at gaps
 data_split <- split_at_gap(data = tracks_gps_O, 
-                           max_gap = 60, 
-                           shortest_track = 20)
+                           max_gap = 90, 
+                           shortest_track = 120)
 ```
 
-An alternative to this approach is to fill large gaps with NAs, but this can be problematic if there is any covariate-dependence on the transition probabilities. You can find some code further below, that handles missing data by setting the gaps to NAs, using the package `adehabitatLT`.
+The new data has an updated `ID` column, where with the original ID and track segment number. The original ID is now in `ID_old`
+
+```{r segmentation, attr.source = ".numberLines"}
+head(data_split)
+```
+
+This data is still irregular, but now we have smaller segments split when there are large data gaps. Let's visualize the different segment.
+
+```{r plot_gps_split_data, warning=FALSE, attr.source = ".numberLines"}
+ggplot() +
+  geom_spatraster(data=bathy) +
+  geom_sf(data=land, fill="beige") +
+  geom_spatial_path(data = data_split, 
+                    aes(x = x, y = y, colour = ID), crs = 4326) +
+  coord_sf(expand = FALSE)
+
+```
+
+Splitting the tracksis often be a first step, before interpolating or other adjustements.
+
+
 
 ### Interpolation (correlated random walk) {#sec-ctcrw}
 
