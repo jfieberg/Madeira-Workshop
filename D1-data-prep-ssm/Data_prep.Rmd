@@ -57,6 +57,9 @@ library(here)       # To help with sourcing
 library(adehabitatLT) # setNA
 library(terra)
 library(tidyterra)
+library(aniMotum)
+library(mitools)  # used by mometuHMM, just need to be installed
+
 # install.packages("aniMotum",
 #                  repos = c("https://cloud.r-project.org",
 #                  "https://ianjonsen.r-universe.dev"),
@@ -238,7 +241,7 @@ head(track_split)
 
 This data is still irregular, but now we have smaller segments split when there are large data gaps. Let's visualize the different segment.
 
-```{r plot_gps_split_data, warning=FALSE, attr.source = ".numberLines"}
+```{r plot_gps_split_data, warning=FALSE, attr.source=".numberLines"}
 ggplot() +
   geom_spatraster(data = bathy) +
   geom_sf(data = land, fill = "beige") +
@@ -391,6 +394,7 @@ gentoo_tracks <- read.csv(
   mutate(ID = factor(ID),
          datetime = ymd_hms(datetime))
   
+gentoo_tracks <- gentoo_tracks %>% subset(ID != "170895" & ID != "170936")
 head(gentoo_tracks)
 ```
 
@@ -442,7 +446,7 @@ gentoo_tracks <- gentoo_tracks %>%
 par(mfrow = c(1, 2))
 hist(gentoo_tracks$dt, 1000, main = NA, xlab = "Time difference (min)")
 hist(gentoo_tracks$dt, 1000, main = NA, xlab = "Time difference (min)",
-     xlim = c(0,100))
+     xlim = c(0,2*60))
 ```
 
 ```{gentoo_dt_ts, attr.source = ".numberLines", fig.width = 10, fig.height = 4}
@@ -461,10 +465,9 @@ gentoo_tracks %>%
   head(20)
 ```
 
-We see that the most frequent time gap is $0$ min, followed by $2$, $1$, and $3$ min. But we also see a large variability. 
+We see that the most frequent time gap is $0$ min, followed by $2$, $1$, and $6$ min. But we also see a large variability. 
 
 We can now use the function `p_na` (in the script `utility_functions.R`) to look at the proportion of NAs we would get with 2hr (120 min), 4 hr (240 min), and 6 hr (360), 12 hr  (720) resolution.
-
 
 
 ```{r gentoo_track_res_prop_NA, attr.source = ".numberLines"}
@@ -498,7 +501,7 @@ head(gentoo_split)
 unique(gentoo_split$ID)
 ```
 
-```{r gentoo_track_res_prop_NA, attr.source = ".numberLines"}
+```{r gentoo_track_res_prop_NA_2, attr.source = ".numberLines"}
 dt_s <- c(2, 4, 6, 12) # hours
 # summarise track dt
 gentoo_split %>% 
@@ -519,37 +522,44 @@ The results change when splitting, but it's still hard to find a perfect resolut
 
 ## Fit state-space model
 
-Format the data for aniMotum. Need to have the good name and order.
 
-```{r}
-library(aniMotum)   # ssm
-```
-
-```{r}
-gentoo_ani <- gentoo_tracks %>%
-  rename(id = ID, date = time, lc = Qual,
-     lon=Longitude, lat=Latitude)
-head(gentoo_ani)
-```
 
 Filter out error, but return at same irregular time interval using a correlated random walk
 
 ```{r}
-gentoo_mpi <- fit_ssm(gentoo_ani, model = "mp")
+gentoo_mpi <- fit_ssm(gentoo_tracks,
+                      id = "ID",
+                      coord = c("Longitude", "Latitude"),
+                      date = "time",
+                      lc = "Qual",
+                      model = "mp")
 head(gentoo_mpi)
+gentoo_mpi
+```
+
+```{r}
 summary(gentoo_mpi)
 ```
 
-Done individual.
+Done individual. "Currently, this model can only be fit to individuals separately."
 
 ```{r}
-plot(gentoo_mpi, what ="fitted", type=2, ncol=2, ask = FALSE)
+plot(gentoo_mpi, what ="fitted", type=2, ask = FALSE)
+plot(gentoo_mpi, what ="fitted", type=1, ask = FALSE)
 ```
+
+Observations that fail the prefilter stage are displayed with x. Rug are observation.
 
 Map the behavioural persistance model.
 
 ```{r}
 aniMotum::map(gentoo_mpi, what = "fitted")
+```
+
+"To aid visualisation of high and low move persistence regions along each track, the γt estimates are normalised separately for each track to span the interval 0,1. This can be turned off with normalise = FALSE, or applied to the group of tracks with group = TRUE." "When fitting to a collection of individuals, the normalisation can be applied separately to each individual or collectively via normalise = TRUE, group = TRUE. In the latter case, the relative magnitudes of move persistence are preserved across individuals."
+
+```{r}
+aniMotum::map(gentoo_mpi, what = "fitted", normalise = TRUE, group = TRUE)
 ```
 
 All individual mapped.
@@ -567,8 +577,10 @@ gentoo_mpi_sf <- gentoo_mpi_t %>%
   st_set_crs(4326)
 
 ggplot() +
-  geom_sf(data = gentoo_mpi_sf, aes(col=g)) +
-  facet_wrap(~id)
+  geom_spatial_path(data =  gentoo_mpi_t, 
+                    aes(x = lon, y = lat, lty = id), 
+                    crs = 4326) +
+  geom_sf(data = gentoo_mpi_sf, aes(col=g)) 
 ```
 
 Filter and regularize
@@ -576,11 +588,60 @@ Filter and regularize
 Given how 
 
 ```{r}
-gentoo_mpr <- fit_ssm(gentoo_ani, model = "mp",
-                      time.step = 30)
+gentoo_mpr <- fit_ssm(gentoo_tracks,
+                      id = "ID",
+                      coord = c("Longitude", "Latitude"),
+                      date = "time",
+                      lc = "Qual",
+                      model = "mp",
+                      time.step = 10)
 head(gentoo_mpr)
 ```
 
 ```{r}
+plot(gentoo_mpr, what ="predicted", type=1, ask=FALSE)
 plot(gentoo_mpr, what ="predicted", type=2, ask=FALSE)
 ```
+
+
+```{r}
+aniMotum::map(gentoo_mpr, what = "predicted")
+```
+
+To be able to do multiple imputation, we could simulate from the posterior. Here we do 4, just to be able to vizualise it.
+
+"Posterior simulations from an SSM fit provide a useful characterization of track uncertainty. The sim_post function provides an efficient method for simulating tracks from the joint uncertainty of the estimated locations."
+
+```{r}
+psim <- sim_post(gentoo_mpr, "p", reps = 4)
+gentoo_post <- psim %>% 
+  unnest(cols = psims) %>% 
+  mutate(rep = factor(rep))
+```
+
+Plots
+
+```{r}
+gentoo_post_sf <- gentoo_post %>%
+  st_as_sf(coords = c("lon", "lat")) %>% # converts to an sf object
+  st_set_crs(4326)
+
+ggplot() +
+  geom_spatial_path(data = gentoo_post, 
+                    aes(x = lon, y = lat, colour = rep),
+                    lwd = 0.3,
+                    crs = 4326) +
+  geom_sf(data = gentoo_post_sf, aes(pch = id, colour = rep), size=0.5)
+```
+
+We can see the slightly different paths.
+
+One-step ahead residuals. 
+
+```{r, cache=TRUE}
+res.crw <- osar(gentoo_mpi)
+plot(res.crw, type = "ts")
+plot(res.crw, type = "qq")
+plot(res.crw, type = "acf")
+```
+
