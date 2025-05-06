@@ -56,6 +56,7 @@ library(kableExtra) # produce visually appealing tables
 library(geosphere)  # to calculate step lengths from lat/lon locations - just need it installed
 library(conicfit)   # needs to be installed for crawlWrap
 library(here)       # To help with sourcing
+library(adehabitatLT) # setNA
 ```
 
 
@@ -116,21 +117,21 @@ tracks_gps_O <- tracks_gps_O %>%
 Let's plot the data over the bathymetry (i.e., depth of the ocean) and land layers, to get a sense of where these narwhals are swimming.
 
 ```{r import_land, results = 'hide', attr.source = ".numberLines"}
-land <- st_read(here("data", "NorthBaffin.shp"))
+land <- st_read(here("D1-data-prep-ssm", "data", "NorthBaffin.shp"))
 ```
 
 The raw bathymetry data used to create this raster was taken from the the GEBCO global ocean and land terrain model from https://pressbooks.bccampus.ca/ewemodel/chapter/getting-bathymetry/. Note that land values of the bathymetry layer are 0s.
 
 ```{r import_bathy, attr.source = ".numberLines"}
-bathy <- rast(here("data", "bathy_4_narwhals.tiff"))
+bathy <- rast(here("D1-data-prep-ssm", "data", "bathy_4_narwhals.tiff"))
 ```
 
 Let's plot the narwhal movement data over the bathymetry and land layers.
 
 ```{r plot_gps_O_data, warning=FALSE, attr.source = ".numberLines"}
 ggplot() +
-  geom_spatraster(data=bathy) +
-  geom_sf(data=land, fill="beige") +
+  geom_spatraster(data = bathy) +
+  geom_sf(data = land, fill = "beige") +
   geom_spatial_path(data = tracks_gps_O, 
                     aes(x = x, y = y, colour = ID), crs = 4326) +
   coord_sf(expand = FALSE)
@@ -220,7 +221,7 @@ We are using a 30 min resolution, so we allow a 90 minute gap (i.e., we assume w
 
 ```{r segmentation, attr.source = ".numberLines"}
 # Use function from utility_function.R to split data at gaps
-data_split <- split_at_gap(data = tracks_gps_O, 
+track_split <- split_at_gap(data = tracks_gps_O, 
                            max_gap = 90, 
                            shortest_track = 120)
 ```
@@ -228,24 +229,22 @@ data_split <- split_at_gap(data = tracks_gps_O,
 The new data has an updated `ID` column, where with the original ID and track segment number. The original ID is now in `ID_old`
 
 ```{r segmentation, attr.source = ".numberLines"}
-head(data_split)
+head(track_split)
 ```
 
 This data is still irregular, but now we have smaller segments split when there are large data gaps. Let's visualize the different segment.
 
 ```{r plot_gps_split_data, warning=FALSE, attr.source = ".numberLines"}
 ggplot() +
-  geom_spatraster(data=bathy) +
-  geom_sf(data=land, fill="beige") +
-  geom_spatial_path(data = data_split, 
+  geom_spatraster(data = bathy) +
+  geom_sf(data = land, fill = "beige") +
+  geom_spatial_path(data = track_split, 
                     aes(x = x, y = y, colour = ID), crs = 4326) +
   coord_sf(expand = FALSE)
 
 ```
 
-Splitting the tracksis often be a first step, before interpolating or other adjustements.
-
-
+Splitting the tracks is often be a first step, before interpolating or other adjustments.
 
 ### Interpolation (correlated random walk) {#sec-ctcrw}
 
@@ -256,63 +255,77 @@ The simplest approach is to use linear interpolation between missing times, but 
 
 First, let us transform the data into an `sf` object. `crawlWrap` can also take a data.frame as an argument but that would imply renaming some of our columns. It is easier to just transform the data into an `sf`  object.
 
+Here it's important to project the data in a good coordinate system, since the model takes into account speed/step length.
 
 ```{r define_projection, message=FALSE, attr.source = ".numberLines"}
-data_sf <- data_split %>%
+track_split_sf <- track_split %>%
   st_as_sf(coords = c("x", "y")) %>% # converts to an sf object
   st_set_crs(4326) %>% # define CRS
   st_transform(2962) # reproject data to a UTM
 ```
 
-Now we can fit the CTCRW to each track segment and create a dataframe of predicted locations.
+Now we can fit the CTCRW to each track segment and create a data frame of predicted locations. We decided above that a good, maybe conservative time interval was 30 min. We will use that interval here. Since interpolating when they are large data gaps can bias our analysis, we use the split tracks. 
 
-```{r crawl_10_min_gps, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
+```{r crawl_30_min_gps, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
 # crawl can fail to fit periodically, so I recommend always setting a seed 
 set.seed(12)
 
 # fit crawl
-crwOut <- crawlWrap(obsData = data_sf, timeStep = "10 mins", theta = c(7, 0))
+crwOut <- crawlWrap(obsData = track_split_sf, timeStep = "30 mins", theta = c(7, 0))
+```
+
+Let's look at a few track segments with interpolated values.
+
+```{r crawl_30_min_gps_plot, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
 plot(crwOut, animals = "T172062-3", ask = FALSE)
+plot(crwOut, animals = "T172064-5", ask = FALSE)
+plot(crwOut, animals = "T172066-4", ask = FALSE)
+```
 
+Notice how the predicted tracks do not make perfectly straight lines through missing sections, which is an improvement on what a simple linear interpolation method would provide. 
+
+We can now extract the predicted regular tracks.
+
+```{r crawl_extract, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
 # Get predicted tracks from crawl output
-data <- crwOut$crwPredict[which(crwOut$crwPredict$locType == "p"),
+track_int <- crwOut$crwPredict[which(crwOut$crwPredict$locType == "p"),
                               c( "ID", "mu.x", "mu.y", "time")]
-colnames(data) <- c( "ID","x", "y", "time")
+colnames(track_int) <- c( "ID","x", "y", "time")
+head(track_int)
 ```
 
-```{r save_regularized_file, eval=FALSE, include=FALSE}
-data_reg <- st_as_sf(data, coords = c("x", "y")) %>% st_set_crs(2962) %>% st_transform(4326)
-data_reg_df <- data_reg %>% mutate(x = st_coordinates(data_reg)[,"X"], y = st_coordinates(data_reg)[,"Y"]) %>% st_drop_geometry()
-data_reg_df$time <- format(data_reg_df$time, "%Y-%m-%d %H:%M:%OS", tz = "UTC", justify = "none")
+Note here that the time is at every 30 min.
 
+
+### Place NAs in (small) gaps
+
+Instead of interpolating, one can leave data gaps as NAs. Some analysis, for example hidden Markov models without spatial covariates extracted from the locations, could easily handle NAs in the locations. The maximum size of a gap to allow depends on the frequency of the missing data, frequency of locations, study species, and behaviours of interest. However, for many analyses that assume regular time interval, it's important to explicitly include the NAs, so that the function knows that there are missing data they have to account for. Placing NAs for missing locations can be used on its own or in conjunction with splitting tracks. The package `adehabitatLR` has a function `setNA` dedicated to it.
+
+We will apply this to the split tracks that we used previously used in the tutorial. Here, instead of using crawl to interpolate missing locations, we are simply creating a dataframe with the missing locations set to NA (i.e., creating a regular grid of observations with some NAs). The idea is that we still want to separate tracks into segment when there are large data gaps, but place NAs when it's just a few locations missing.
+
+The first step is to create an adhabitat trajectory. Here, we simply input coordinates, time, and the ID (here track segment id).
+
+```{r ltraj, attr.source = ".numberLines"}
+track_ltraj <- as.ltraj(xy = track_split[, c("x", "y")], 
+                                   date = track_split$time, 
+                                   id = track_split$ID)
 ```
 
-Notice how the predicted tracks do not make perfectly straight lines through missing sections, which is an improvement on simple linear interpolation methods. 
-
-### Pad gaps with NAs
-We mentioned previously that another strategy to address data gaps is to leave the data streams (i.e., step length and turning angle) as NAs. The maximum size of a gap to allow depends on the frequency of the missing data, frequency of locations, study species, and behaviours of interest. Voiding gaps can be used on its own or in conjunction with splitting tracks. The package `adehabitatLR` has a function `setNA` dedicated to it.
-
-Let us first install and load the package.
-
-```{r package setNA,include=FALSE}
-library(adehabitatLT)
-```
-
-We will apply this to the split tracks that we used previously used in the tutorial. Here, instead of using crawl to interpolate missing locations, we are simply creating a dataframe with the missing locations set to NA (i.e., creating a regular grid of observations with some NAs).
+Now we set the NAs. As before, we use a time interval of 30 min. We specify that we have a tolerance for the imprecision in the data, here at most 15 min. We use the first location at the time reference.
 
 ```{r setNA, attr.source = ".numberLines"}
 # Create adehabitat object, containing the trajectory padded with NAs
-data_ade <- setNA(ltraj = as.ltraj(xy = data_split[, c("x", "y")], 
-                                   date = data_split$time, 
-                                   id = data_split$ID), 
-                  date.ref = data_split$time[1], 
-                  dt = 10, tol = 5, units = "min")
+track_NA <- setNA(ltraj = track_ltraj, 
+                  date.ref = track_split$time[1], 
+                  dt = 30, tol = 15, units = "min")
 
 # Transform back to dataframe
-data_na <- ld(data_ade)[, c("id", "x", "y", "date")]
-colnames(data_na) <- c("ID", "x", "y", "time")
+track_NA <- ld(track_NA)[, c("id", "x", "y", "date")]
+colnames(track_NA) <- c("ID", "x", "y", "time")
+head(track_NA)
 ```
 
+We can see now that there are NAs for some locations, and that the time is not exactly at every 30 min, but close to. So this may not be adequate for some analysis that require strict time regularity.
 
 ### Multiple Imputation
 
