@@ -375,3 +375,38 @@ mute <- mapply(function(data, col) {
 
 Notice how in some areas the different simulations have generally good agreement in the likely location during gaps, while in others they diverge. Multiple imputation can be particularly powerful if we want to incorporate environmental variables, as spatially explicit variables can be extracted for each simulated track to sample the most likely conditions encountered by the animal.
 
+# Filtering error
+
+## Gentoo movement data
+
+
+```{r}
+gentoo_tracks <- read.csv(here("D1-data-prep-ssm", "data", "gentoo_Argos.csv"))
+head(gentoo_tracks)
+gentoo_tracks %>% count(Platform.ID.No.)
+gentoo_5 <- gentoo_tracks %>% 
+  subset(Platform.ID.No. %in% c(170895, 170902, 170905, 170914, 170936)) %>% 
+  dplyr::select(Platform.ID.No., 
+                Loc..date, Longitude, Latitude, Loc..quality) %>% 
+  mutate(ID = factor(Platform.ID.No.),
+    datetime = ymd_hms(Loc..date),
+    Qual = Loc..quality) %>%
+  arrange(Platform.ID.No., datetime) %>%
+  dplyr::select(ID, datetime, )
+
+write.csv(gentoo_5, )
+
+head(gentoo_5)
+
+gentoo_5 <- gentoo_5 %>% filter(!is.na(Longitude) & !is.na(Latitude)) 
+sum(is.na(gentoo_5))
+gentoo_5_sf <- gentoo_5 %>%
+  st_as_sf(coords = c("Longitude", "Latitude")) %>% # converts to an sf object
+  st_set_crs(4326)
+
+ggplot() +
+  # geom_spatraster(data = bathy) +
+  # geom_sf(data = land, fill = "beige") +
+  geom_sf(data = gentoo_5_sf, aes(col = ID)) #+
+  #coord_sf(expand = FALSE)
+```
