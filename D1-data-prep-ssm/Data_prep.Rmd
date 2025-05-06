@@ -325,7 +325,7 @@ colnames(track_NA) <- c("ID", "x", "y", "time")
 head(track_NA)
 ```
 
-We can see now that there are NAs for some locations, and that the time is not exactly at every 30 min, but close to. So this may not be adequate for some analysis that require strict time regularity.
+We can see now that there are NAs for some locations, and that the time is not exactly at every 30 min, but close to. So this may not be adequate for some analysis that require strict time regularity. One could round to the nearest 30min, but this could be problematic.
 
 ### Multiple Imputation
 
