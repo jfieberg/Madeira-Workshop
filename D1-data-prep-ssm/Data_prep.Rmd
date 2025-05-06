@@ -57,6 +57,11 @@ library(geosphere)  # to calculate step lengths from lat/lon locations - just ne
 library(conicfit)   # needs to be installed for crawlWrap
 library(here)       # To help with sourcing
 library(adehabitatLT) # setNA
+library(aniMotum)   # ssm
+# install.packages("aniMotum", 
+#                  repos = c("https://cloud.r-project.org",
+#                  "https://ianjonsen.r-universe.dev"),
+#                  dependencies = TRUE)
 ```
 
 
@@ -394,8 +399,15 @@ We want to remove any row that is missing latitude or longitude data.
 
 ```{r clean_gentoo, attr.source = ".numberLines"}
 gentoo_tracks <- gentoo_tracks %>% 
-  filter(!is.na(Longitude) & !is.na(Latitude))
+  filter(!is.na(Longitude) & !is.na(Latitude),
+         # remove identical records
+         !(datetime == lag(datetime) & 
+             Longitude == lag(Longitude) & 
+             Latitude == lag(Latitude) & 
+             Qual == lag(Qual)))
 ```
+
+Here, the data are already sorted in order of ID and datetime, but this is not always the case. 
 
 Let's make a spatial object and plot the data.
 
@@ -412,4 +424,36 @@ ggplot() +
   #coord_sf(expand = FALSE)
 ```
 
+## Fit state-space model
 
+Format the data for aniMotum. Need to have the good name and order.
+
+```{r}
+gentoo_ani <- gentoo_tracks %>%
+  rename(id = ID, date = datetime, lc = Qual,
+     lon=Longitude, lat=Latitude)
+head(gentoo_ani)
+```
+
+Filter out error, but return at same irregular time interval using a correlated random walk
+
+```{r}
+gentoo_mpi <- fit_ssm(gentoo_ani, model = "crw")
+head(gentoo_mpi)
+```
+
+```{r}
+plot(gentoo_mpi, what ="fitted", type=2, ask=FALSE)
+```
+
+Filter and regularize
+
+```{r}
+gentoo_mpr <- fit_ssm(gentoo_ani, model = "mp",
+                      time.step = 6)
+head(gentoo_mpr)
+```
+
+```{r}
+plot(gentoo_mpr, what ="predicted", type=2, ask=FALSE)
+```
