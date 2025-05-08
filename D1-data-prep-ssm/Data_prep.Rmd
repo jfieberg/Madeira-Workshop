@@ -602,6 +602,16 @@ ggplot() +
   coord_sf(crs = 4326)
 ```
 
+One-step ahead residuals. 
+
+```{r, cache=TRUE}
+res.crw <- osar(gentoo_mpi)
+plot(res.crw, type = "ts")
+plot(res.crw, type = "qq")
+plot(res.crw, type = "acf")
+```
+
+
 
 ## Using a state-space model to account for Argos error and regularise
 
@@ -644,42 +654,36 @@ head(gentoo_mpr_t)
 
 Notice that the locations are now at every 4 hours.
 
-## Using a state-space model to account for Argos error and regularise
 
-To be able to do multiple imputation, we could simulate from the posterior. Here we do 4, just to be able to vizualise it.
+## Multiple simulated tracks for multiple imputation
 
+To be able to do multiple imputation, we could simulate from the posterior. Here we do 4, just to be able to vizualise it. This process is similar to the process we did for the narwhal data above.
+
+According to the vignette of `aniMotum` they state: 
 "Posterior simulations from an SSM fit provide a useful characterization of track uncertainty. The sim_post function provides an efficient method for simulating tracks from the joint uncertainty of the estimated locations."
 
-```{r}
-psim <- sim_post(gentoo_mpr, "p", reps = 4)
+```{r mi_mps, attr.source = ".numberLines", cache=TRUE}
+set.seed(2025)
+psim <- sim_post(gentoo_mpr, what = "predicted", reps = 4)
+# Grab the data to be able to use it
 gentoo_post <- psim %>% 
   unnest(cols = psims) %>% 
   mutate(rep = factor(rep))
 ```
 
-Plots
+Plots the tracks created by the simulations.
 
-```{r}
-gentoo_post_sf <- gentoo_post %>%
-  st_as_sf(coords = c("lon", "lat")) %>% # converts to an sf object
-  st_set_crs(4326)
-
+```{r plot_mi_mps, attr.source = ".numberLines", cache=TRUE}
 ggplot() +
   geom_spatial_path(data = gentoo_post, 
                     aes(x = lon, y = lat, colour = rep),
                     lwd = 0.3,
                     crs = 4326) +
-  geom_sf(data = gentoo_post_sf, aes(pch = id, colour = rep), size=0.5)
+  geom_spatial_point(data = gentoo_post, 
+                    aes(x = lon, y = lat, pch = id, colour = rep),
+                    crs = 4326) +
+  coord_sf(crs = 4326)
 ```
 
-We can see the slightly different paths.
-
-One-step ahead residuals. 
-
-```{r, cache=TRUE}
-res.crw <- osar(gentoo_mpi)
-plot(res.crw, type = "ts")
-plot(res.crw, type = "qq")
-plot(res.crw, type = "acf")
-```
+We can see the slightly different paths. Replicate of 0 is the original track produce by the state-space model.
 
