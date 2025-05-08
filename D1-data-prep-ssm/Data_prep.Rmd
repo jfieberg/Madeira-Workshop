@@ -66,7 +66,6 @@ library(mitools)  # used by mometuHMM, just need to be installed
 #                  dependencies = TRUE)
 ```
 
-
 We are assuming that you are working from Madeira-Workshop repository main folder, and using `here()` to help find the good directory for each files.
 We will need the functions in the following file `utility_functions.R`.
 
@@ -386,15 +385,14 @@ Notice how in some areas the different simulations have generally good agreement
 
 ## Gentoo movement data
 
-We have the data from 5 gentoo penguins. We load it and change the ID to a factor and the datetime into a datetime object
+We have the data from 3 gentoo penguins. We load it and change the ID to a factor and the datetime into a datetime object
 
 ```{r load_gentoo, attr.source = ".numberLines"}
 gentoo_tracks <- read.csv(
-  here("D1-data-prep-ssm", "data", "tracks_argos.csv")) %>%
+  here("D1-data-prep-ssm", "data", "tracks_argos_gentoo.csv")) %>%
   mutate(ID = factor(ID),
          datetime = ymd_hms(datetime))
   
-gentoo_tracks <- gentoo_tracks %>% subset(ID != "170895" & ID != "170936")
 head(gentoo_tracks)
 ```
 
