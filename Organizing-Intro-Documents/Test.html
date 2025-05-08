@@ -3128,7 +3128,7 @@ vertical-align: -.125em;
 <div class="cell-output cell-output-stdout">
 <pre><code>
 The downloaded binary packages are in
-    /var/folders/zh/mds_l3s53jn_09hwspz_m_fw0000gp/T//Rtmp1iqFTh/downloaded_packages</code></pre>
+    /var/folders/zh/mds_l3s53jn_09hwspz_m_fw0000gp/T//RtmpnfRCNA/downloaded_packages</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># install aniMotum (not on cran)</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;aniMotum&quot;</span>,</span>
@@ -3138,7 +3138,7 @@ The downloaded binary packages are in
 <div class="cell-output cell-output-stdout">
 <pre><code>
 The downloaded binary packages are in
-    /var/folders/zh/mds_l3s53jn_09hwspz_m_fw0000gp/T//Rtmp1iqFTh/downloaded_packages</code></pre>
+    /var/folders/zh/mds_l3s53jn_09hwspz_m_fw0000gp/T//RtmpnfRCNA/downloaded_packages</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Install (or update) all other packages</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>pkg.required <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;amt&quot;</span>,</span>
@@ -3160,20 +3160,21 @@ The downloaded binary packages are in
 <span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>                  <span class="st">&quot;here&quot;</span>,</span>
 <span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>                  <span class="st">&quot;adehabitatLT&quot;</span>,</span>
 <span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>                  <span class="st">&quot;terra&quot;</span>,</span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>                  <span class="st">&quot;tidyterra&quot;</span>)</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>                  <span class="st">&quot;tidyterra&quot;</span>,</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>                  <span class="st">&quot;RTMB&quot;</span>)</span>
 <span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>pkg.available <span class="ot">&lt;-</span> <span class="fu">installed.packages</span>()[, <span class="st">&quot;Package&quot;</span>]</span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(pkg.required <span class="sc">%in%</span> pkg.available)) {</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>  pkg.missing <span class="ot">&lt;-</span> pkg.required[<span class="sc">!</span>pkg.required <span class="sc">%in%</span> pkg.available]</span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">install.packages</span>(pkg.missing, <span class="at">dependencies =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>} </span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>pkg.available <span class="ot">&lt;-</span> <span class="fu">installed.packages</span>()[, <span class="st">&quot;Package&quot;</span>]</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(pkg.required <span class="sc">%in%</span> pkg.available)) {</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>  pkg.missing <span class="ot">&lt;-</span> pkg.required[<span class="sc">!</span>pkg.required <span class="sc">%in%</span> pkg.available]</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">install.packages</span>(pkg.missing, <span class="at">dependencies =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>} </span>
 <span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>pkg.required <span class="ot">&lt;-</span> <span class="fu">append</span>(pkg.required,<span class="fu">c</span>(<span class="st">&quot;momentuHMM&quot;</span>, <span class="st">&quot;aniMotum&quot;</span>))</span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="fu">sapply</span>(pkg.required, require, <span class="at">character.only =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>pkg.required <span class="ot">&lt;-</span> <span class="fu">append</span>(pkg.required,<span class="fu">c</span>(<span class="st">&quot;momentuHMM&quot;</span>, <span class="st">&quot;aniMotum&quot;</span>))</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="fu">sapply</span>(pkg.required, require, <span class="at">character.only =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Loading required package: amt</code></pre>
 </div>
@@ -3390,6 +3391,8 @@ The following object is masked from &#39;package:stats&#39;:
     filter
 
 
+Loading required package: RTMB
+
 Loading required package: momentuHMM
 
 momentuHMM 2.0.0 (2025-04-29)
@@ -3433,8 +3436,8 @@ The following object is masked from &#39;package:amt&#39;:
          TRUE          TRUE          TRUE          TRUE          TRUE 
     geosphere          here  adehabitatLT         terra     tidyterra 
          TRUE          TRUE          TRUE          TRUE          TRUE 
-   momentuHMM      aniMotum 
-         TRUE          TRUE </code></pre>
+         RTMB    momentuHMM      aniMotum 
+         TRUE          TRUE          TRUE </code></pre>
 </div>
 </div>
 </section>
@@ -3497,24 +3500,24 @@ coxph(formula = Surv(rep(1, 5753L), case_) ~ forest + cos_ta +
 
   n= 5753, number of events= 523 
 
-                 coef  exp(coef)   se(coef)      z Pr(&gt;|z|)    
-forestTRUE  0.6509217  1.9173071  0.1244194  5.232 1.68e-07 ***
-cos_ta      0.0278936  1.0282862  0.0664330  0.420    0.675    
-sl_        -0.0003244  0.9996757  0.0005272 -0.615    0.538    
-log_sl      0.0909824  1.0952497  0.0622881  1.461    0.144    
+                coef exp(coef)  se(coef)     z Pr(&gt;|z|)    
+forestTRUE 0.6960542 2.0058225 0.1274416 5.462 4.71e-08 ***
+cos_ta     0.0439109 1.0448892 0.0674202 0.651    0.515    
+sl_        0.0001675 1.0001675 0.0005150 0.325    0.745    
+log_sl     0.0849784 1.0886935 0.0602922 1.409    0.159    
 ---
 Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
 
            exp(coef) exp(-coef) lower .95 upper .95
-forestTRUE    1.9173     0.5216    1.5024     2.447
-cos_ta        1.0283     0.9725    0.9027     1.171
-sl_           0.9997     1.0003    0.9986     1.001
-log_sl        1.0952     0.9130    0.9694     1.237
+forestTRUE     2.006     0.4985    1.5625     2.575
+cos_ta         1.045     0.9570    0.9156     1.193
+sl_            1.000     0.9998    0.9992     1.001
+log_sl         1.089     0.9185    0.9674     1.225
 
-Concordance= 0.583  (se = 0.016 )
-Likelihood ratio test= 30.37  on 4 df,   p=4e-06
-Wald test            = 29.68  on 4 df,   p=6e-06
-Score (logrank) test = 30.18  on 4 df,   p=5e-06</code></pre>
+Concordance= 0.573  (se = 0.016 )
+Likelihood ratio test= 35.12  on 4 df,   p=4e-07
+Wald test            = 34.49  on 4 df,   p=6e-07
+Score (logrank) test = 35.19  on 4 df,   p=4e-07</code></pre>
 </div>
 </div>
 </section>
@@ -3776,18 +3779,18 @@ attached base packages:
 other attached packages:
  [1] doRNG_1.8.6.2       rngtools_1.5.2      foreach_1.5.2      
  [4] crawl_2.3.0         aniMotum_1.2-10     momentuHMM_2.0.0   
- [7] tidyterra_0.7.2     adehabitatLT_0.3.28 adehabitatMA_0.3.17
-[10] ade4_1.7-23         sp_2.2-0            geosphere_1.5-20   
-[13] kableExtra_1.4.0    ggspatial_1.1.9     conicfit_1.0.4     
-[16] geigen_2.3          pracma_2.4.4        mitools_2.4        
-[19] moveHMM_1.10        CircStats_0.2-6     boot_1.3-31        
-[22] MASS_7.3-65         terra_1.8-42        here_1.0.1         
-[25] broom_1.0.8         tictoc_1.2.1        glmmTMB_1.1.11     
-[28] TwoStepCLogit_1.2.6 lubridate_1.9.4     forcats_1.0.0      
-[31] stringr_1.5.1       dplyr_1.1.4         purrr_1.0.4        
-[34] readr_2.1.5         tidyr_1.3.1         tibble_3.2.1       
-[37] ggplot2_3.5.2       tidyverse_2.0.0     sf_1.0-20          
-[40] amt_0.2.2.0        
+ [7] RTMB_1.7            tidyterra_0.7.2     adehabitatLT_0.3.28
+[10] adehabitatMA_0.3.17 ade4_1.7-23         sp_2.2-0           
+[13] geosphere_1.5-20    kableExtra_1.4.0    ggspatial_1.1.9    
+[16] conicfit_1.0.4      geigen_2.3          pracma_2.4.4       
+[19] mitools_2.4         moveHMM_1.10        CircStats_0.2-6    
+[22] boot_1.3-31         MASS_7.3-65         terra_1.8-42       
+[25] here_1.0.1          broom_1.0.8         tictoc_1.2.1       
+[28] glmmTMB_1.1.11      TwoStepCLogit_1.2.6 lubridate_1.9.4    
+[31] forcats_1.0.0       stringr_1.5.1       dplyr_1.1.4        
+[34] purrr_1.0.4         readr_2.1.5         tidyr_1.3.1        
+[37] tibble_3.2.1        ggplot2_3.5.2       tidyverse_2.0.0    
+[40] sf_1.0-20           amt_0.2.2.0        
 
 loaded via a namespace (and not attached):
   [1] circular_0.5-1         RColorBrewer_1.1-3     rstudioapi_0.17.1     

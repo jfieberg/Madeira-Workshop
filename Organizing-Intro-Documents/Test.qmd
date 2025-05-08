@@ -49,7 +49,8 @@ pkg.required <- c("amt",
                   "here",
                   "adehabitatLT",
                   "terra",
-                  "tidyterra")
+                  "tidyterra",
+                  "RTMB")
 
 
 pkg.available <- installed.packages()[, "Package"]
