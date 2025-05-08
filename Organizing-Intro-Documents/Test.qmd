@@ -31,7 +31,16 @@ pkg.required <- c("amt",
                   "broom",
                   "here",
                   "terra",
-                  "moveHMM")
+                  "moveHMM",
+                  "mitools",
+                  "conicfit",
+                  "ggspatial",
+                  "kableExtra",
+                  "geosphere",
+                  "here",
+                  "adehabitatLT",
+                  "terra",
+                  "tidyterra")
 
 
 pkg.available <- installed.packages()[, "Package"]
@@ -44,7 +53,13 @@ if (!all(pkg.required %in% pkg.available)) {
 # install 'develop' version of momentuHMM
 install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"), dependencies = TRUE)
 
-pkg.required <- append(pkg.required,"momentuHMM")
+# install aniMotum (not on cran)
+install.packages("aniMotum",
+                 repos = c("https://cloud.r-project.org",
+                 "https://ianjonsen.r-universe.dev"),
+                 dependencies = TRUE)
+
+pkg.required <- append(pkg.required,c("momentuHMM", "aniMotum"))
 sapply(pkg.required, require, character.only = TRUE)
 ```
  
