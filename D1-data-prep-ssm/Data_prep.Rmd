@@ -602,16 +602,16 @@ ggplot() +
   coord_sf(crs = 4326)
 ```
 
-One-step ahead residuals. 
+It is important to check whether the model is appropriate for the data. To do so, we can look at one-step ahead residuals. This will take a few minute to run.
 
-```{r, cache=TRUE}
+```{r osar, cache=TRUE}
 res.crw <- osar(gentoo_mpi)
 plot(res.crw, type = "ts")
 plot(res.crw, type = "qq")
 plot(res.crw, type = "acf")
 ```
 
-
+We can see here that the model is not perfect. There is still a bit of autocorrelation and the model is not great for very small and large values. But overall it's looking not too bad. 
 
 ## Using a state-space model to account for Argos error and regularise
 
