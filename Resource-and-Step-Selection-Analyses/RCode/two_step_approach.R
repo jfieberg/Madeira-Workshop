@@ -108,9 +108,11 @@ coefs0 <- bind_rows(res, .id = "name")
 
 #' We will explore later, how to do summarize these results. But first, we will
 #' explore the use of list columns to do the same.
+#' 
 
-#' ### Using list columns 
+#' ### Using list columns ----
 
+#' We can create a nested data frame using...
 dat.n <- dat %>% nest(data = -c(NA_ANIMAL))
 dat.n$NA_ANIMAL[4]
 dat.n$data[[4]]
@@ -155,7 +157,7 @@ pop <- coefs1 %>% nest(dat = -term) %>%
     lci = map_dbl(boot, ~ quantile(.x, probs = 0.025)),
     uci = map_dbl(boot, ~ quantile(.x, probs = 0.975)))
 
-#' We can use this data to create a plot
+#' We can use these data to create a plot
 
 coefs0 %>% 
   ggplot(aes(term, estimate)) + 
