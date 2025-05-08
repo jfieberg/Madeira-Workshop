@@ -90,6 +90,7 @@ fisher_trk <- make_track(fisherdat, x, y, t, crs = 4326) |>
 ```
 
 Resample the track to 10 minutes with a tolerance of 2 minutes.
+
 ```{r}
 fisher_trk <- fisher_trk |>
   track_resample(rate = minutes(10), tolerance = seconds(120)) 
