@@ -11,4 +11,5 @@
     - MultipleAnimalsSSsF.R = Code for fitting SSFs to multiple fisher using 2-step and mixed effects models
     - RenderOutput.R = Code for knitting code files and writing output to the Output folder
 - **Exercises**:  Exercises to test your understanding
-    - SSF-Exercise-1.Rmd:  Fitting and interpretting an SSF fit to 1 individual 
+    - SSF-Exercise-1.Rmd:  Fitting and interpreting an SSF fit to 1 individual 
+    - SSF-Exercise-2.Rmd:  Fitting and interpretting an SSF fit to multiple individuals
