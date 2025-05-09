@@ -61,79 +61,12 @@ dat[1:30,]
 
 
 ########################################################################################
-### Part 2: Fixed effects models
+### Random effects models
 ########################################################################################
 
-##########################
-### 2A) The "Cox trick"
-##########################
+###  Random effects SSFs using glmmTMB
 
-#' Remember that the conditional logistic regression model is a special case of the Cox proportional hazard model. clogit() is a wrapper function for the respective formulation. 
- 
-#' You can check more info:
-# ?clogit()
-
-#' Fitting the model with habitat type (STAU1, REST1), river width and step length
-r.clogit <- clogit(Loc ~ STAU1 + REST1 + Sohlenbrei + Breaks_Dis  
-                   +   strata(str_ID), data=dat) 
-
-summary(r.clogit)$coef
-
-#' However, clogit() cannot handle random effects, that is, it is not possible to e.g. include animal-specific effes on habitat type or river width. This is where the "Poisson trick" from Muff et al. (2020) is coming into play.  
-
-
-##########################
-### 2B) The "Poisson trick"
-##########################
- 
-## 2B.2) Frequentist approach: glmmTMB
- 
-#' The approach in glmmTMB is to write down the model, but not fit it.
-
-TMBStruc.fix = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +
-                         Breaks_Dis +  (1|str_ID), 
-                       family=poisson, data=dat, doFit=FALSE) 
-
-#' Then manually fix the (log of the) standard deviation of the first random term, which is the `(1|str_ID)` component  in the above model equation:
-TMBStruc.fix$parameters$theta[1] = log(1e3) 
-
-#' We need to tell glmmTMB not to change the variance by setting it to NA:
-TMBStruc.fix$mapArg = list(theta=factor(c(NA)))
-
-#' Then fit the model and look at the results:
-glmm.TMB.fixed = glmmTMB:::fitTMB(TMBStruc.fix) 
-summary(glmm.TMB.fixed)
-
-
-#' Alternatively (maybe easier), there is a one-step way to carry out the regression with newer versions of glmmTMB:
-glmm.TMB.fixed = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +
-                           Breaks_Dis +  (1|str_ID), 
-                         family=poisson, data=dat, 
-                         map=list(theta=factor(c(NA))),
-                         start=list(theta=c(log(1e3))))
-
-summary(glmm.TMB.fixed)
-
-
-###' Bonus: Illustration why the intercept term should be removed. Rerun without "-1" in the formula, and compare the fixed effect estimates:
-
-glmm.TMB.fixed.2 = glmmTMB(Loc ~  STAU1 + REST1 + Sohlenbrei +
-                           Breaks_Dis +  (1|str_ID), 
-                         family=poisson, data=dat, 
-                         map=list(theta=factor(c(NA))),
-                         start=list(theta=c(log(1e3))))
-
-summary(glmm.TMB.fixed.2)
-
-
-########################################################################################
-### Part 3: Random effects models
-########################################################################################
-
-### 3B) Random effects SSFs using glmmTMB
-
-#' And finally, the same mixed effects model using glmmTMB(). 
-#' As before, start to set up the model without fitting it. Independent random effects are added as  (0 + STAU1 | ANIMAL_ID), for animal-specific slopes of "STAU1", for example:
+#' Set up the model without fitting it. Independent random effects are added as  (0 + STAU1 | ANIMAL_ID), for animal-specific slopes of "STAU1", for example:
 
 TMBStruc = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +  
                      Breaks_Dis +  (1|str_ID) + 
@@ -142,23 +75,19 @@ TMBStruc = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +
                      (0 + Sohlenbrei | ANIMAL_ID), 
                    family=poisson, data=dat, doFit=FALSE) 
 
-#' Now there is more than one variance parameter to be estimated:
+#' Variance parameters in the model (there are 4, the first we want to fix to a large value)
 TMBStruc$parameters$theta
+nvarparm<-length(TMBStruc$parameters$theta)
 
 #' Since (1|str_ID) is the first parameter in the formula, it is the one we have to fix.
 #' Therefore, set the value of the (log of the) standard deviation of the first random effect (here (1|str_ID)) to the fixed value:
 TMBStruc$parameters$theta[1] = log(1e3) 
 
 #' Tell glmmTMB not to change the first standard deviation (NA), all other values are freely estimated (and are different from each other)
-TMBStruc$mapArg = list(theta=factor(c(NA,1:3)))
+TMBStruc$mapArg = list(theta=factor(c(NA,1:(nvarparm-1))))
 
 #' Fit the model and look at the summary:
-tic()
 glmm.TMB.random <- glmmTMB:::fitTMB(TMBStruc)
-toc()
-
-#' Check the speed and compare to the speed of INLA.
-
 summary(glmm.TMB.random)
 
 #' 95\% CIs for fixed and random effects (standard deviations) are obtained via the confint() function:
@@ -166,7 +95,7 @@ confint(glmm.TMB.random)
 
 
 
-#' Again, there is a one-step way to carry out the regression with newer versions of glmmTMB:
+#'There is a one-step way to carry out the regression with newer versions of glmmTMB:
 
 glmm.TMB.random = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +  
                             Breaks_Dis +  (1|str_ID) + 

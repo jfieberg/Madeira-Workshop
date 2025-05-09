@@ -60,6 +60,8 @@ plot(hab[[1]])
 points(trk)
 lines(trk)
 
+
+#' 
 #' ## iSSFs in 'amt' 
 
 #' ### Creating steps
@@ -98,16 +100,22 @@ nrow(trk2)/nrow(gps)
 print(trk2, n = 10)
 
 #' Notice we removed our 10th location -- we have a 2h gap from 
-#' 2021-02-15 08:00 to 2021-02-15 10:00. 
+#' 2021-02-15 08:00 to 2021-02-15 10:00.
 #'
 #' What happens if we make steps, now?
 stp2 <- steps(trk2)
 # View(stp2)
 
 #' We now have some steps where dt = 2 hours. Our trajectory is irregular, 
-#' and that will not work for iSSA. We can filter out those 2 hour steps
+#' and that will not work for iSSA. We can use the `summarize_sampling_rate`
+#' function to look at the sampling frequency. 
+summarize_sampling_rate(trk2)
+
+#' 
+#' 
+#' We can filter out those 2 hour steps
 #' fairly easily in this simplified example, but a more useful way to
-#' deal with this is to use the function `track_resample()`.
+#' deal with this is to use the function `track_resample()`.  
 #'
 #' `track_resample()` takes the track, the desired duration, and a tolerance
 #' around that duration as arguments, then it divides a trajectory into
@@ -206,16 +214,37 @@ ta_distr(obs_avail)
 #' Since we used the von Mises distribution as our tentative turn-angle
 #' distribution, we need to include cos(turn angle) in our iSSF.
 #'
+#'
+#' We can use other distributions within the exponential family, which will require 
+#' that we include different movement covariates.  See:
+#' [Appendix C of Fieberg et al. 2021](https://conservancy.umn.edu/server/api/core/bitstreams/a4a63c0b-bceb-45e1-bd05-2b81dc4575a9/content).
+#'
 
 #' ### Extracting Covariates
 #' 
 #' Now that we have observed and available steps, we need to attach our
 #' environmental covariates to each one. We can use the functions
-#' 'extract_covariates()' to attach the raster values to our steps.
+#' 'extract_covariates()' to attach the raster values to our steps. 
 covs <- extract_covariates(obs_avail, hab)
  
 #' Have a look:
 print(covs, n = 3, width = 200)
+
+#' We can extract covariates at the start or end of each step or at both the 
+#' start and end of each step.  Typically:
+#' 
+#' - Covariates at the end of the step are used for modeling habitat selection
+#' - Covariates at the start of the step are used to model effects of local
+#' habitat on the movement kernel.
+#' 
+#' But, other options are possible (e.g., one could use the mean of the 
+#' starting and ending covariates or measure covariates along a straight path
+#' connecting the start and end locations [but the latter would require custom
+#' code]).
+covsboth <- extract_covariates(obs_avail, hab, where = "both")
+
+#' Have a look:
+print(covsboth, n = 3, width = 200) 
 
 #' One of the great strengths of iSSA is that it can handle temporal 
 #' variation. Perhaps our organism selects habitat differently between

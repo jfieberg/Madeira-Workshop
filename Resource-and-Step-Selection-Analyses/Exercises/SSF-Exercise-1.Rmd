@@ -1,0 +1,130 @@
+---
+title: "Step-selection function: Exericise 1"
+output: html_document
+---
+
+For this exercise, you will work with Scott Lapoint's fisher data:
+
+LaPoint, S, Gallery P, Wikelski M, Kays R (2013) Animal behavior, cost-based corridor models, and real corridors. Landscape Ecology, v 28 i 8, p 1615–1630. doi:10.1007/s10980-013-9910-0
+
+LaPoint S, Gallery P, Wikelski M, Kays R (2013) Data from: Animal behavior, cost-based corridor models, and real corridors. Movebank Data Repository. doi:10.5441/001/1.2tp2j43g
+
+Or, alternatively, feel free to work with your own data!
+
+Let's load packages we will need.
+
+```{r warning = FALSE, message = FALSE}
+library(amt)
+library(terra)
+librayr(tidyverse)
+library(here)
+```
+
+It will help to have the `amt_demo_iSSF.html` file open as you work through the 
+exercise.
+
+First, we will read in the data and environmental layers capturing elevation, 
+population density, and landuse categories.  We will center and scale the 
+covariate data and also create an indicator variable that is 1 if the 
+observation is in forest and 0 otherwise.
+
+```{r}
+# Location data 
+dat <- read_csv(here("Resource-and-Step-Selection-Analyses/Data", "fisher_data.csv")) 
+
+# Environmental layers
+elevation <- rast(here("Resource-and-Step-Selection-Analyses/Data/elevation/", "ASTER ASTGTM2 Elevation-20100101120000000-0-0.tif"))
+landuse <- rast(here("Resource-and-Step-Selection-Analyses/Data/landuse", "landuse_study_area.tif"))
+popden <- rast(here("Resource-and-Step-Selection-Analyses/Data/pop_den", "pop_den.tif"))
+
+# Center and scale elevation and popden
+elevation[] <- (elevation[] - mean(elevation[], na.rm = TRUE))/sd(elevation[], na.rm = TRUE)
+popden[] <- (popden[] - mean(popden[], na.rm = TRUE))/sd(popden[], na.rm = TRUE)
+ 
+# Reproject rasters to EPSG:5070
+landuse <- project(landuse, "EPSG:5070")
+elevation <- project(elevation, "EPSG:5070")
+popden <- project(popden, "EPSG:5070")
+
+# Create a binary layer where landuse classes 41 to 43 represent forest
+forest <- landuse %in% 41:43
+plot(forest)
+
+# Rename the layers
+names(elevation)<-"elevation"
+names(forest)<-"forest"
+names(popden)<-"popden"
+```
+
+
+
+1. Filter the data to include observations from one of the individuals (feel free to choose a different individual).
+```{r}
+dat <- dat %>% 
+  filter(id == 1078) 
+dat
+```
+
+2. Create a track using the `make_track` function.
+```{r}
+
+```
+
+3. Check the sampling rate of the observations using the `summarize_sampling_rate`.
+```{r}
+
+```
+
+
+4. Use `track_resample` to choose an appropriate sampling frequency to model movements.
+```{r}
+
+```
+
+5. Create a *steps* version fo the data using the `steps_by_burst` function.
+```{r}
+
+```
+
+
+5. Plot the empirical distribution of step lengths and turn angles. 
+
+```{r}
+
+```
+
+
+6. Use the `random_steps` function to:  a) fit a gamma distribution to the step 
+lenghts and a von-Mises distribution to the turn angles, and b) generate 
+20 random steps for each observed step. 
+
+```{r}
+
+```
+
+
+7. Extract covariates for population, elevation, and forest.  You can choose
+whether to extract these covariate values at the start of the step, end of the 
+step, or both.
+```{r}
+
+```
+
+8. Fit a step-selection model to the data form step 7.
+```{r}
+
+```
+
+9. Interpret the parameters in terms of relative probability of use. Hint: look 
+at a summary of the model using the `summary` function.
+
+```{r}
+
+```
+
+10. Plot updated step length and turn angle distributions.
+
+```{r}
+
+```
+

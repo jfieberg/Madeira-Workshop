@@ -1,0 +1,263 @@
+---
+title: "Step-selection function: Exericise 1"
+output: html_document
+---
+
+For this exercise, you will work with Scott Lapoint's fisher data:
+
+LaPoint, S, Gallery P, Wikelski M, Kays R (2013) Animal behavior, cost-based corridor models, and real corridors. Landscape Ecology, v 28 i 8, p 1615–1630. doi:10.1007/s10980-013-9910-0
+
+LaPoint S, Gallery P, Wikelski M, Kays R (2013) Data from: Animal behavior, cost-based corridor models, and real corridors. Movebank Data Repository. doi:10.5441/001/1.2tp2j43g
+
+Or, alternatively, feel free to work with your own data!
+
+Let's load packages we will need.
+
+```{r warning = FALSE, message = FALSE}
+library(amt)
+library(terra)
+library(tidyverse)
+library(here)
+```
+
+It will help to have the `amt_demo_iSSF.html` file open as you work through the 
+exercise.
+
+First, we will read in the data and environmental layers capturing elevation, 
+population density, and landuse categories.  We will center and scale the 
+covariate data and also create an indicator variable that is 1 if the 
+observation is in forest and 0 otherwise.
+
+```{r}
+# Location data 
+dat <- read_csv(here("Resource-and-Step-Selection-Analyses/Data", "fisher_data.csv")) 
+
+# Environmental layers
+elevation <- rast(here("Resource-and-Step-Selection-Analyses/Data/elevation/", "ASTER ASTGTM2 Elevation-20100101120000000-0-0.tif"))
+landuse <- rast(here("Resource-and-Step-Selection-Analyses/Data/landuse", "landuse_study_area.tif"))
+popden <- rast(here("Resource-and-Step-Selection-Analyses/Data/pop_den", "pop_den.tif"))
+
+# Center and scale elevation and popden
+elevation[] <- (elevation[] - mean(elevation[], na.rm = TRUE))/sd(elevation[], na.rm = TRUE)
+popden[] <- (popden[] - mean(popden[], na.rm = TRUE))/sd(popden[], na.rm = TRUE)
+ 
+# Reproject rasters to EPSG:5070
+landuse <- project(landuse, "EPSG:5070")
+elevation <- project(elevation, "EPSG:5070")
+popden <- project(popden, "EPSG:5070")
+
+# Create a binary layer where landuse classes 41 to 43 represent forest
+forest <- landuse %in% 41:43
+
+# Plot forest
+plot(forest)
+
+# Rename the layers
+names(elevation)<-"elevation"
+names(forest)<-"forest"
+names(popden)<-"popden"
+
+```
+
+
+
+1. Filter the data to include observations from one of the individuals (feel free to choose a different individual).
+```{r}
+dat <- dat %>% 
+  filter(id == 1072) 
+dat
+```
+
+2. Create a track using the `make_track` function. Use the arguement crs = 4326. 
+Then, use transform_coords to transform the track to crs 5070.
+```{r}
+trk <- make_track(dat, .x = x, .y = y, .t = t, crs = 4326)
+trk <- trk %>% transform_coords(crs_to = 5070)
+```
+
+3. Check the sampling rate of the observations using the `summarize_sampling_rate`.
+```{r}
+summarize_sampling_rate(trk)
+```
+
+
+4. Use `track_resample` to choose an appropriate sampling frequency to model movements.
+Note: there are many options here, but the median time interval is 10 minutes (so, that is the shortest sampling frequency we should choose).
+```{r}
+trk2 <-track_resample(trk, rate = minutes(10), tolerance = minutes(1))
+```
+
+5. Create a *steps* version fo the data using the `steps_by_burst` function.
+```{r}
+fishersteps <- steps_by_burst(trk2)
+```
+
+
+5. Plot the empirical distribution of step lengths and turn angles. 
+
+The distribution of step lengths is highly right skewed. There are some really large
+step lengths that should probably be looked at to make sure they are reasonable
+(these may be due to large measurement errors).
+```{r}
+ggplot(fishersteps, aes(x = sl_)) + 
+  geom_histogram(aes(y = ..density..), binwidth = 2)  
+```
+
+The distribution of turn angles is multi-modal with modes at 0 and +/- $\pi$ (as if often the case).
+```{r}
+ggplot(fishersteps, aes(x = ta_)) + 
+  geom_histogram(aes(y = ..density..), binwidth = 0.2)  
+```
+
+
+6. Use the `random_steps` function to:  a) fit a gamma distribution to the step 
+lenghts and a von-Mises distribution to the turn angles, and b) generate 
+20 random steps for each observed step. 
+
+```{r}
+obsavail <- random_steps(fishersteps, n_control = 20)
+```
+
+
+7. Extract covariates for population, elevation, and forest.  You can choose
+whether to extract these covariate values at the start of the step, end of the 
+step, or both.
+```{r}
+ssfdat <- obsavail %>%
+  extract_covariates(elevation, where = "both") %>%
+  extract_covariates(forest, where = "end") %>%
+  extract_covariates(popden, where = "end") %>%
+  mutate(log_sl_ = log(sl_))
+```
+
+8. Fit a step-selection model to the data form step 7.
+```{r}
+m1 <- fit_issf(ssfdat, 
+               case_ ~ elevation_end + forest + popden + 
+                 sl_ + log_sl_ + cos(ta_) + (sl_+log_sl_):elevation_start +
+               strata(step_id_),
+               model=TRUE)
+summary(m1)
+```
+
+9. Interpret the parameters in terms of relative probability of use.
+
+Broadly: the fisher appears to be selecting for higher elevations 
+(positive coefficient, but not statistically significant),
+forest (positive coefficient), and lower population densities (negative coefficient).  
+The step lengths also depend on elevation at the starting location.
+
+Looking at the exponentiated coefficient for forest, we can conclude that
+if presented with two identical observations (with respect to elevation,
+population density, and distance from the fisher), the fisher would be 2.29 times
+more likely to choose the location in the forest. If we exponentiate the coefficients
+for elevation and popden, we can state similar conclusions (but they represent
+comparisons that differ by 1 in these variables).  Since the variables were 
+centered and scaled, we would conclude the fisher would be 0.57 times less likely to
+choose a location that was 1 sd higher in population density, but otherwise had 
+the same elevation and landuse type. 
+ 
+
+10. Plot updated step length and turn angle distributions.
+
+Tentative distribution
+```{r}
+tent_sl <- sl_distr(m1)
+```
+
+Because we have an interaction between the step length variables and a continuous variable, 
+we have to use the `update_gamma` function as outlined in [Appendix B of Fieberg et al. 2021](https://conservancy.umn.edu/server/api/core/bitstreams/63727072-87b1-4b35-b81c-8fd31b8f1e57/content).
+
+Updated distribution when elevation_start = 25th percentile 
+
+```{r}
+elevs.025 <- quantile(ssfdat$elevation_start, prob = 0.025)
+upd_sl_low <- update_gamma(dist = m1$sl_,  
+                           beta_sl = m1$model$coefficients["sl_"] +
+                               elevs.025*m1$model$coefficients["sl_:elevation_start"],
+                           beta_log_sl = m1$model$coefficients["log_sl_"] +
+                               elevs.025*m1$model$coefficients["log_sl_:elevation_start"]) 
+```
+Now, get the distribution at the 75% of elevation_start
+
+```{r}
+elevs.975 <- quantile(ssfdat$elevation_start, prob = 0.975)
+upd_sl_high <- update_gamma(dist = m1$sl_,  
+                           beta_sl = m1$model$coefficients["sl_"] +                       
+                              elevs.975*m1$model$coefficients["sl_:elevation_start"],
+                           beta_log_sl = m1$model$coefficients["log_sl_"] +     
+                             elevs.975*m1$model$coefficients["log_sl_:elevation_start"]) 
+```
+Put these all together and plot the distributions.
+
+```{r}
+tent_df <- data.frame(dist = "tent",
+                      shp = tent_sl$params$shape,
+                      scl = tent_sl$params$scale)
+upd_high <- data.frame(dist = "upd High",
+                     shp = upd_sl_high$params$shape,
+                     scl = upd_sl_high$params$scale)
+upd_low <- data.frame(dist = "upd Low",
+                     shp = upd_sl_low$params$shape,
+                     scl = upd_sl_low$params$scale)
+(sl_df <- rbind(tent_df, upd_high, upd_low))
+
+expand.grid(sl = seq(1, 1500, length.out = 100),
+            dist = c("tent", "upd High", "upd Low")) %>% 
+  left_join(sl_df) %>% 
+  mutate(y = dgamma(sl, shape = shp, scale = scl)) %>% 
+  ggplot(aes(x = sl, y = y, color = dist)) +
+  geom_line() +
+  xlab("Step Length (m)") +
+  ylab("Probability Density") +
+  theme_bw()
+```
+
+Mean step length for the gamma = shape * scale parameter
+```{r}
+sl_df$mean = sl_df$shp*sl_df$scl
+sl_df
+```
+
+Now, let's look at the turn angle distribution.  First, we update the parameters.
+```{r}
+tent_ta <- ta_distr(m1)
+upd_ta <- update_ta_distr(m1, beta_cos_ta = "cos(ta_)")
+tent_df_ta <- data.frame(dist = "tent",
+                         mu = tent_ta$params$mu,
+                         k = tent_ta$params$kappa)
+(upd_df_ta <- data.frame(dist = "upd",
+                        mu = upd_ta$params$mu,
+                        k = upd_ta$params$kappa))
+
+
+```
+
+The von Mises is not defined for negative kappa. Negative kappa indicates that the turns are not actually concentrated around 0 (as we typically assume), but rather are concentrated around +/- pi. If this happens, we can simply multiply the estimated kappa by -1 and change mu to pi.
+
+```{r}
+upd_df_ta <- data.frame(dist = "upd",
+                        mu = pi,
+                        k = -1 * upd_ta$params$kappa)
+(ta_df <- rbind(tent_df_ta, upd_df_ta))
+```
+
+Plot the distribution.
+
+```{r}
+expand.grid(ta = seq(-pi, pi, length.out = 100),
+            dist = c("tent", "upd")) %>% 
+  left_join(ta_df) %>% 
+  # circular::dvonmises is not vectorized
+  rowwise() %>% 
+  mutate(y = circular::dvonmises(ta, mu = mu, kappa = k)) %>% 
+  ggplot(aes(x = ta, y = y, color = dist)) +
+  geom_line() +
+  xlab("Turn Angle (radians)") +
+  ylab("Probability Density") +
+  scale_x_continuous(breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                     labels = expression(-pi, -pi/2, 0, pi/2, pi)) +
+  coord_cartesian(ylim = c(0, 0.4)) +
+  theme_bw()
+```
+

@@ -8,7 +8,8 @@ library(here)
 library(rmarkdown)
 
 #' Source directory for these files 
-render(here("Resource-and-Step-Selection-Analyses/RCode", "two_step_approach.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
-render(here("Resource-and-Step-Selection-Analyses/RCode", "Otters_SSF.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
+#' 
 render(here("Resource-and-Step-Selection-Analyses/RCode", "amt_demo_iSSF.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
-render(here("Resource-and-Step-Selection-Analyses/RCode", "MultipleAnimals.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
+render(here("Resource-and-Step-Selection-Analyses/RCode", "Otters_SSF.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
+render(here("Resource-and-Step-Selection-Analyses/RCode", "MultipleAnimalsRSFs.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
+render(here("Resource-and-Step-Selection-Analyses/RCode", "MultipleAnimalsSSFs.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))

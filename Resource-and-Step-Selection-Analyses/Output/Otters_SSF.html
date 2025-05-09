@@ -11,7 +11,7 @@
 
 <meta name="author" content="jfieberg" />
 
-<meta name="date" content="2025-04-15" />
+<meta name="date" content="2025-05-08" />
 
 <title>Otters_SSF.R</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">Otters_SSF.R</h1>
 <h4 class="author">jfieberg</h4>
-<h4 class="date">2025-04-15</h4>
+<h4 class="date">2025-05-08</h4>
 
 </div>
 
@@ -475,154 +475,24 @@ one realized (Loc=1) and 9 available locations (Loc=0):</p>
 ## 27          Dan 12132   0 -0.3962283    0     1     0 -0.70196619         4      3
 ## 37506       Dan 12132   1  0.2966381    1     0     0  0.16248003         4      3</code></pre>
 <pre class="r"><code>########################################################################################
-### Part 2: Fixed effects models
+### Random effects models
 ########################################################################################
 
-##########################
-### 2A) The &quot;Cox trick&quot;
-##########################</code></pre>
-<p>Remember that the conditional logistic regression model is a special
-case of the Cox proportional hazard model. clogit() is a wrapper
-function for the respective formulation. You can check more info:</p>
-<pre class="r"><code># ?clogit()</code></pre>
-<p>Fitting the model with habitat type (STAU1, REST1), river width and
-step length</p>
-<pre class="r"><code>r.clogit &lt;- clogit(Loc ~ STAU1 + REST1 + Sohlenbrei + Breaks_Dis  
-                   +   strata(str_ID), data=dat) 
-
-summary(r.clogit)$coef</code></pre>
-<pre><code>##                   coef exp(coef)   se(coef)         z     Pr(&gt;|z|)
-## STAU1      -0.07328577 0.9293352 0.06862720 -1.067882 2.855736e-01
-## REST1      -0.38498046 0.6804639 0.09722675 -3.959614 7.507086e-05
-## Sohlenbrei  0.15680599 1.1697686 0.03780309  4.147967 3.354405e-05
-## Breaks_Dis -0.02051501 0.9796940 0.01681737 -1.219871 2.225139e-01</code></pre>
-<p>However, clogit() cannot handle random effects, that is, it is not
-possible to e.g. include animal-specific effes on habitat type or river
-width. This is where the “Poisson trick” from Muff et al. (2020) is
-coming into play.</p>
-<pre class="r"><code>##########################
-### 2B) The &quot;Poisson trick&quot;
-##########################
- 
-## 2B.2) Frequentist approach: glmmTMB</code></pre>
-<p>The approach in glmmTMB is to write down the model, but not fit
-it.</p>
-<pre class="r"><code>TMBStruc.fix = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +
-                         Breaks_Dis +  (1|str_ID), 
-                       family=poisson, data=dat, doFit=FALSE) </code></pre>
-<p>Then manually fix the (log of the) standard deviation of the first
-random term, which is the <code>(1|str_ID)</code> component in the above
-model equation:</p>
-<pre class="r"><code>TMBStruc.fix$parameters$theta[1] = log(1e3) </code></pre>
-<p>We need to tell glmmTMB not to change the variance by setting it to
-NA:</p>
-<pre class="r"><code>TMBStruc.fix$mapArg = list(theta=factor(c(NA)))</code></pre>
-<p>Then fit the model and look at the results:</p>
-<pre class="r"><code>glmm.TMB.fixed = glmmTMB:::fitTMB(TMBStruc.fix) 
-summary(glmm.TMB.fixed)</code></pre>
-<pre><code>##  Family: poisson  ( log )
-## Formula:          Loc ~ -1 + STAU1 + REST1 + Sohlenbrei + Breaks_Dis + (1 | str_ID)
-## Data: dat
-## 
-##      AIC      BIC   logLik deviance df.resid 
-##  85061.0  85095.5 -42526.5  85053.0    41666 
-## 
-## Random effects:
-## 
-## Conditional model:
-##  Groups Name        Variance Std.Dev.
-##  str_ID (Intercept) 1e+06    1000    
-## Number of obs: 41670, groups:  str_ID, 4167
-## 
-## Conditional model:
-##            Estimate Std. Error z value Pr(&gt;|z|)    
-## STAU1      -0.07332    0.06863  -1.068    0.285    
-## REST1      -0.38510    0.09723  -3.961 7.47e-05 ***
-## Sohlenbrei  0.15681    0.03780   4.148 3.35e-05 ***
-## Breaks_Dis -0.02052    0.01682  -1.220    0.222    
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>Alternatively (maybe easier), there is a one-step way to carry out
-the regression with newer versions of glmmTMB:</p>
-<pre class="r"><code>glmm.TMB.fixed = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +
-                           Breaks_Dis +  (1|str_ID), 
-                         family=poisson, data=dat, 
-                         map=list(theta=factor(c(NA))),
-                         start=list(theta=c(log(1e3))))
-
-summary(glmm.TMB.fixed)</code></pre>
-<pre><code>##  Family: poisson  ( log )
-## Formula:          Loc ~ -1 + STAU1 + REST1 + Sohlenbrei + Breaks_Dis + (1 | str_ID)
-## Data: dat
-## 
-##      AIC      BIC   logLik deviance df.resid 
-##  85061.0  85095.5 -42526.5  85053.0    41666 
-## 
-## Random effects:
-## 
-## Conditional model:
-##  Groups Name        Variance Std.Dev.
-##  str_ID (Intercept) 1e+06    1000    
-## Number of obs: 41670, groups:  str_ID, 4167
-## 
-## Conditional model:
-##            Estimate Std. Error z value Pr(&gt;|z|)    
-## STAU1      -0.07332    0.06863  -1.068    0.285    
-## REST1      -0.38510    0.09723  -3.961 7.47e-05 ***
-## Sohlenbrei  0.15681    0.03780   4.148 3.35e-05 ***
-## Breaks_Dis -0.02052    0.01682  -1.220    0.222    
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>Bonus: Illustration why the intercept term should be removed. Rerun
-without “-1” in the formula, and compare the fixed effect estimates:</p>
-<pre class="r"><code>glmm.TMB.fixed.2 = glmmTMB(Loc ~  STAU1 + REST1 + Sohlenbrei +
-                           Breaks_Dis +  (1|str_ID), 
-                         family=poisson, data=dat, 
-                         map=list(theta=factor(c(NA))),
-                         start=list(theta=c(log(1e3))))
-
-summary(glmm.TMB.fixed.2)</code></pre>
-<pre><code>##  Family: poisson  ( log )
-## Formula:          Loc ~ STAU1 + REST1 + Sohlenbrei + Breaks_Dis + (1 | str_ID)
-## Data: dat
-## 
-##      AIC      BIC   logLik deviance df.resid 
-##  85062.9  85106.1 -42526.5  85052.9    41665 
-## 
-## Random effects:
-## 
-## Conditional model:
-##  Groups Name        Variance Std.Dev.
-##  str_ID (Intercept) 1e+06    1000    
-## Number of obs: 41670, groups:  str_ID, 4167
-## 
-## Conditional model:
-##             Estimate Std. Error z value Pr(&gt;|z|)    
-## (Intercept) -2.76923   15.49133  -0.179    0.858    
-## STAU1       -0.07329    0.06863  -1.068    0.286    
-## REST1       -0.38499    0.09723  -3.960 7.50e-05 ***
-## Sohlenbrei   0.15680    0.03780   4.148 3.36e-05 ***
-## Breaks_Dis  -0.02052    0.01682  -1.220    0.222    
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>########################################################################################
-### Part 3: Random effects models
-########################################################################################
-
-### 3B) Random effects SSFs using glmmTMB</code></pre>
-<p>And finally, the same mixed effects model using glmmTMB(). As before,
-start to set up the model without fitting it. Independent random effects
-are added as (0 + STAU1 | ANIMAL_ID), for animal-specific slopes of
-“STAU1”, for example:</p>
+###  Random effects SSFs using glmmTMB</code></pre>
+<p>Set up the model without fitting it. Independent random effects are
+added as (0 + STAU1 | ANIMAL_ID), for animal-specific slopes of “STAU1”,
+for example:</p>
 <pre class="r"><code>TMBStruc = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +  
                      Breaks_Dis +  (1|str_ID) + 
                      (0 + STAU1 | ANIMAL_ID) + 
                      (0 + REST1 | ANIMAL_ID)   + 
                      (0 + Sohlenbrei | ANIMAL_ID), 
                    family=poisson, data=dat, doFit=FALSE) </code></pre>
-<p>Now there is more than one variance parameter to be estimated:</p>
+<p>Variance parameters in the model (there are 4, the first we want to
+fix to a large value)</p>
 <pre class="r"><code>TMBStruc$parameters$theta</code></pre>
 <pre><code>## [1] 0 0 0 0</code></pre>
+<pre class="r"><code>nvarparm&lt;-length(TMBStruc$parameters$theta)</code></pre>
 <p>Since (1|str_ID) is the first parameter in the formula, it is the one
 we have to fix. Therefore, set the value of the (log of the) standard
 deviation of the first random effect (here (1|str_ID)) to the fixed
@@ -631,14 +501,10 @@ value:</p>
 <p>Tell glmmTMB not to change the first standard deviation (NA), all
 other values are freely estimated (and are different from each
 other)</p>
-<pre class="r"><code>TMBStruc$mapArg = list(theta=factor(c(NA,1:3)))</code></pre>
+<pre class="r"><code>TMBStruc$mapArg = list(theta=factor(c(NA,1:(nvarparm-1))))</code></pre>
 <p>Fit the model and look at the summary:</p>
-<pre class="r"><code>tic()
-glmm.TMB.random &lt;- glmmTMB:::fitTMB(TMBStruc)
-toc()</code></pre>
-<pre><code>## 3.23 sec elapsed</code></pre>
-<p>Check the speed and compare to the speed of INLA.</p>
-<pre class="r"><code>summary(glmm.TMB.random)</code></pre>
+<pre class="r"><code>glmm.TMB.random &lt;- glmmTMB:::fitTMB(TMBStruc)
+summary(glmm.TMB.random)</code></pre>
 <pre><code>##  Family: poisson  ( log )
 ## Formula:          Loc ~ -1 + STAU1 + REST1 + Sohlenbrei + Breaks_Dis + (1 | str_ID) +      (0 + STAU1 | ANIMAL_ID) + (0 + REST1 | ANIMAL_ID) + (0 +  
 ##     Sohlenbrei | ANIMAL_ID)
@@ -676,7 +542,7 @@ obtained via the confint() function:</p>
 ## Std.Dev.STAU1|ANIMAL_ID         0.09196532  0.80191477  0.271566470
 ## Std.Dev.REST1|ANIMAL_ID.1       0.09636594  1.05838186  0.319361813
 ## Std.Dev.Sohlenbrei|ANIMAL_ID.2  0.13332008  0.52972521  0.265749893</code></pre>
-<p>Again, there is a one-step way to carry out the regression with newer
+<p>There is a one-step way to carry out the regression with newer
 versions of glmmTMB:</p>
 <pre class="r"><code>glmm.TMB.random = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +  
                             Breaks_Dis +  (1|str_ID) + 
