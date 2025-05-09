@@ -1,5 +1,5 @@
 #' ---
-#' title: "Multiple RSF's with Fisher data"
+#' title: "Multiple SSF's with Fisher data"
 #' author: "John Fieberg & Johannes Signer"
 #' date: ""
 #' output:
@@ -106,7 +106,7 @@ dat_ssf <- dat1 %>%
   mutate(
     y = as.numeric(case_),
     id = as.numeric(factor(id)), 
-    step_id = paste0(id, step_id_, sep = "-")) %>%
+    step_id = paste(id, step_id_, sep = ":")) %>%
     dplyr::select(id, sex, y, step_id, elevation, popden, forest)
   dat_ssf
   dat_ssf$forest <- as.numeric(dat_ssf$forest)
@@ -259,6 +259,8 @@ ggplot(data=allests,
 
 #' With SEs and dropping the two-step method
 #+ fig.width=14, fig.height=6
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+"#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 ggplot(data=allests[allests$method!="two_step",], 
        aes(x=id, y=estimate, col=method))+
   geom_point(size=3.5)+

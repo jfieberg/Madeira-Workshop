@@ -11,5 +11,6 @@ library(rmarkdown)
 #' 
 render(here("Resource-and-Step-Selection-Analyses/RCode", "amt_demo_iSSF.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
 render(here("Resource-and-Step-Selection-Analyses/RCode", "Otters_SSF.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
+render(here("Resource-and-Step-Selection-Analyses/RCode", "OttersTwoStep.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
 render(here("Resource-and-Step-Selection-Analyses/RCode", "MultipleAnimalsRSFs.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))
 render(here("Resource-and-Step-Selection-Analyses/RCode", "MultipleAnimalsSSFs.R"), output_dir = here("Resource-and-Step-Selection-Analyses/","Output"))

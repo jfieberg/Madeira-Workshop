@@ -44,7 +44,8 @@ str(dat)
 dat$ANIMAL_ID <- as.numeric(as.factor(dat$NA_ANIMAL))
 
 #' Stratum ID is given as "NA_ID" in the data; 
-#' It is easier to have sequential enumeration, so let's generate a new stratum-ID variable str_ID:
+#' It is easier to have sequential enumeration, so let's generate a new 
+#' stratum-ID variable str_ID:
 d.map <- data.frame(NA_ID=unique(dat$NA_ID),str_ID=1:length(unique(dat$NA_ID)))
 dat$str_ID <- d.map[match(dat$NA_ID,d.map$NA_ID),"str_ID"]
 dat <- dat[order(dat$str_ID),]

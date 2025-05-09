@@ -1,0 +1,130 @@
+---
+title: "SSF-Exercise-2"
+output: html_document
+---
+
+Using the Otters_SSF.html and OttersTwo_step.html as resources:
+
+1. Fit a mixed SSF model to the fisher data.
+2. Fit models to individuals and estimate typical (i.e. mean) coefficients for 
+`popden`, `forest`, and `elevation`, along with a confidence interval for the mean.
+
+To help, I've provided code that you can use to read in adn process the data below, and you can look at a solution (`MultipleAnimalsSSFs.R`) in the output folder.
+
+## Load libraries
+
+```{r warning=FALSE, message=FALSE}
+library(glmmTMB)
+library(tidyverse) 
+library(survival)
+library(TwoStepCLogit)
+library(amt)
+library(here)
+library(broom)  
+library(terra)
+options(width=165)
+knitr::opts_chunk$set(fig.width=12,fig.height=4.5, error=TRUE)
+set.seed(09081940)
+``` 
+
+## Read in environmental data layers
+
+```{r}
+elevation <- rast(here("Resource-and-Step-Selection-Analyses/Data/elevation/", "ASTER ASTGTM2 Elevation-20100101120000000-0-0.tif"))
+landuse <- rast(here("Resource-and-Step-Selection-Analyses/Data/landuse", "landuse_study_area.tif"))
+popden <- rast(here("Resource-and-Step-Selection-Analyses/Data/pop_den", "pop_den.tif"))
+
+# Center and scale elevation and popden
+elevation[] <- (elevation[] - mean(elevation[], na.rm = TRUE))/sd(elevation[], na.rm = TRUE)
+popden[] <- (popden[] - mean(popden[], na.rm = TRUE))/sd(popden[], na.rm = TRUE)
+
+# Reproject rasters to EPSG:5070
+landuse <- project(landuse, "EPSG:5070")
+elevation <- project(elevation, "EPSG:5070")
+popden <- project(popden, "EPSG:5070")
+
+# Create a binary layer where landuse classes 41 to 43 represent forest
+forest <- landuse %in% 41:43
+names(elevation)<-"elevation"
+names(forest)<-"forest"
+names(popden)<-"popden"
+```
+
+
+## Read in the fisher data  
+
+```{r}
+dat <- read_csv(here("Resource-and-Step-Selection-Analyses/Data", "fisher_data.csv")) %>% 
+  filter(id %in% c(1465, 1466, 1072, 1078, 1016, 1469)) 
+```
+
+Create tracks with an appropriate coordinate reference system.
+
+```{r}
+dat_all <- dat %>% nest(data=c(x,y,t))  
+
+#' Create tracks with an appropriate coordinate reference system
+#' using the amt package
+dat_all <- dat_all %>% 
+  mutate(trk = map(data, function(d) {
+    make_track(d, x, y, t, crs = 4326) %>% 
+      transform_coords(crs_to = 5070)
+  }))
+dat_all
+```
+
+
+Looking at the sampling rates, 10 minutes seems to appropriate for all animals.
+
+```{r}
+dat_all %>% mutate(sr = map(trk, summarize_sampling_rate)) %>% 
+  dplyr::select(id, sr) %>% unnest(cols=c(sr))
+```
+
+Resample the track to 10 minutes with a tolerance of 2 minutes.
+
+```{r}
+dat1 <- dat_all %>% mutate(dat_clean = map(trk, ~ {
+  .x %>% track_resample(rate = minutes(10), tolerance = seconds(120))
+}))
+```
+
+
+Now, prepare the data for model fitting by: 
+
+1) creating a steps version of the data (with `steps_by_burst`),
+2) parameterizing gamma and von-Mises distributions for the step lengths
+and turn angles, respectively, and then generate 10 random steps for each
+observed step (with `random_steps`),
+3) extract covariates at the end of the step (with `extract covariates`)
+
+This is relatively easy to do with nested data frames (show below). We will
+also create our strata variable, step_id for including the random intercept with
+large fixed variance.  Importantly, this needs to be created by pasting together
+the `step_id_` variable created by `amt` with the individual id. Otherwise, the 
+first burst for individual 1 will be associated with the first burst for 
+individual 2, 3, etc since `step_id_` starts over for each individual.
+
+```{r}
+dat_ssf <- dat1 %>% 
+  mutate(stps = map(dat_clean, ~ .x %>% 
+                      steps_by_burst() %>% 
+                      random_steps() %>%
+                      extract_covariates(forest) %>%
+                      extract_covariates(elevation) %>% 
+                      extract_covariates(popden))) %>%
+  unnest(stps) %>%
+  mutate(
+    y = as.numeric(case_),
+    step_id = paste(id, step_id_, sep = ":"),
+    id = as.numeric(factor(id))) %>%
+    dplyr::select(id, y, step_id, elevation, popden, forest)
+  dat_ssf$forest <- as.numeric(dat_ssf$forest)
+dat_ssf
+```
+
+
+At this point, you should have everything you need for fitting a mixed SSA using 
+glmmTMB (or for fitting models to individuals).
+
+

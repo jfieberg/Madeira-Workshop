@@ -5,13 +5,14 @@
 #'  The otter data are taken from Weinberger et al (2016). Flexible habitat selection paves the way for a recovery of otter populations in the European Alps, Biological Conservation 199, p. 88-95, https://doi.org/10.1016/j.biocon.2016.04.017
 
 # Load libraries and read in data
-#+warning=FALSE, message=FALSE
+#+ warning=FALSE, message=FALSE
 library(survival)
 library(tidyverse)
 library(glmmTMB)
 library(broom)
 library(tictoc)
 library(here)
+library(boot)
 
 dat <-  read.csv(here("Resource-and-Step-Selection-Analyses/Data", "d_otter.csv"))
 
@@ -40,7 +41,8 @@ dat$Breaks_Dis <- scale(dat$Breaks_Dis)
 dat$ANIMAL_ID <- as.numeric(as.factor(dat$NA_ANIMAL))
 
 #' Stratum ID is given as "NA_ID" in the data; 
-#' It is easier to have sequential enumeration, so let's generate a new stratum-ID variable str_ID:
+#' It is easier to have sequential enumeration, so let's generate a new 
+#' stratum-ID variable str_ID:
 d.map <- data.frame(NA_ID=unique(dat$NA_ID),str_ID=1:length(unique(dat$NA_ID)))
 dat$str_ID <- d.map[match(dat$NA_ID,d.map$NA_ID),"str_ID"]
 dat <- dat[order(dat$str_ID),]
@@ -114,13 +116,12 @@ coefs0 <- bind_rows(res, .id = "name")
 
 #' We can create a nested data frame using...
 dat.n <- dat %>% nest(data = -c(NA_ANIMAL))
-dat.n$NA_ANIMAL[4]
-dat.n$data[[4]]
 
 #' We could add as many grouping variables as we want to `-c(NA_ANIMAL)` to make
 #' the model more complex.
 
 #' Each element of the list `data` is a `data.frame` with the data for a given animal. 
+dat.n$NA_ANIMAL[4]
 dat.n$data[[4]]
 
 #' This makes it easy to fit an individual model for each animal
@@ -136,7 +137,7 @@ dat.n <- dat.n %>%
                 clogit(Loc ~ STAU1 + REST1 + Sohlenbrei +  Breaks_Dis + strata(str_ID), 
                        data = .x) %>% tidy()))
 dat.n
-coefs1 <- dat.n %>% select(NA_ANIMAL, ssf) %>% unnest(cols = ssf)
+coefs1 <- dat.n %>% dplyr::select(NA_ANIMAL, ssf) %>% unnest(cols = ssf)
 
  
 # Ensure the two approaches lead to the same result (which they do). 
@@ -146,32 +147,57 @@ plot(coefs0$estimate, coefs1$estimate)
 
 #' We could now work with the coefficients and for example plot males vs. females
 #' or some other individual property. Here we will only calculate the mean and a
-#' CI for the mean.
+#' CI for the mean for each coefficient.
 
-#' We use a bootstrap for the mean
-coefs1
-pop <- coefs1 %>% nest(dat = -term) %>% 
-  mutate(
-    mean = map_dbl(dat, ~ mean(.x$estimate)), 
-    boot = map(dat, ~ replicate(1e4, mean(sample(.x$estimate, replace = TRUE)))), 
-    lci = map_dbl(boot, ~ quantile(.x, probs = 0.025)),
-    uci = map_dbl(boot, ~ quantile(.x, probs = 0.975)))
+#' Confidence intervals using the t-distribution (assuming coefficients are 
+#' normally distributed)
+se<-function(x){sd(x)/sqrt(length(x))}
+statsonstats<- coefs1 %>% group_by(term) %>% 
+  summarize(mean=mean(estimate), se=se(estimate), n = n()) %>%
+  mutate(lci = mean + qt(0.975, df = n-1)*se,
+         uci = mean + qt(0.025, df = n-1)*se) %>%
+  mutate(method = "t")
+statsonstats
 
-#' We can use these data to create a plot
+#' We use a non-parametric bootstrap to get a confidence interval for the mean,
+#' sampling individuals with replacement.  It will help to have a wide version
+#' of the data set containing the coefficients.
+coefs1_wide <- coefs1 %>% 
+  dplyr::select(term, estimate, NA_ANIMAL) %>%
+  pivot_wider(., names_from=term, values_from=estimate)
 
-coefs0 %>% 
-  ggplot(aes(term, estimate)) + 
-  geom_hline(yintercept = 0, lty = 2) +
-  geom_point(alpha = 0.3) +
-  geom_pointrange(aes(ymin = lci, ymax = uci, y = mean), 
-                  data = pop, alpha = 0.9, col = "red") +
-  theme_light() 
+
+
+boot_mean <- function(data, indices) {
+  d <- data[indices, ]  # Resample rows, select column
+  return(apply(d, 2, FUN=mean, na.rm = TRUE))
+}
+ 
+results <- boot(data = coefs1_wide[,-1], statistic = boot_mean,
+                   R = 9999)
+
+
+#' Let's use bias-corrected and accelerated intervals
+ci_list <- lapply(1:4, function(i) {
+  boot.ci(results, type = "bca", index = i)
+})
+bca_intervals <- sapply(ci_list, function(ci) {
+  c(lci = ci$bca[4], uci = ci$bca[5])
+})
+colnames(bca_intervals) <- colnames(coefs1_wide[,-1])
+bca_intervals <- as.data.frame(t(bca_intervals)) %>%
+  mutate(term = colnames(bca_intervals)) %>%
+  arrange(term) %>% 
+  mutate(method = "bootstrap") 
+bca_intervals$mean <- statsonstats$mean
+bca_intervals <- bca_intervals %>%
+  dplyr::select(term, mean, lci, uci, method)
+bca_intervals 
 
 #' ### Compare with glmmTMB() 
 
 #' Now let us compare our results to what we got using glmmTMB
 
-tic()
 glmm.TMB.random = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +  
                             Breaks_Dis + (1|str_ID) + 
                             (0 + STAU1 | ANIMAL_ID) + 
@@ -182,26 +208,28 @@ glmm.TMB.random = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +
                           map = list(theta = factor(c(NA, 1:4))),
                           start = list(theta = c(log(1e3), 0, 0, 0, 0))
 )
-toc()
-
-summary(glmm.TMB.random)
 
 #' Combine results and plot
-pop2 <- pop %>% select(term, mean, lci, uci) %>%
+statsonstats <- statsonstats %>%
+  dplyr::select(-c(se, n))
+pop <- rbind(statsonstats, bca_intervals)
+pop2 <- pop %>% dplyr::select(term, mean, lci, uci, method) %>%
   rename(Estimate = mean, Term = term)
 mixediSSF <- confint(glmm.TMB.random)
-mixedcoef <- data.frame(Term = pop2$Term, 
+mixedcoef <- data.frame(Term = pop2$Term[1:4], 
                         Estimate = mixediSSF[1:4, 3],
                         lci = mixediSSF[1:4, 1],
-                        uci = mixediSSF[1:4, 2])
+                        uci = mixediSSF[1:4, 2],
+                        method = "Mixed SSF")
 pop2 <- rbind(pop2, mixedcoef)
-pop2$method<-rep(c("Individual Fit", "Mixed iSSF"), each=4)
-
+ 
+#' Plot everything together
+#+ fig.width = 8, fig.height=5, out.width = "100%"
 coefs0 <- coefs0 %>% rename(Term = term, Estimate=estimate)
 ggplot(coefs0, aes(Term, Estimate)) + 
   geom_point(alpha = 0.3) +
   geom_hline(yintercept = 0, lty = 2) +
   geom_pointrange(aes(ymin = lci, ymax = uci, y = Estimate, col = method), 
                    data=pop2, alpha = 0.9, position = position_dodge2(width=0.2)) +
-  theme_light() 
+  theme_light()  
 

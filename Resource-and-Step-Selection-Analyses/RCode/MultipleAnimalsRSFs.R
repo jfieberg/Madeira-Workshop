@@ -135,7 +135,7 @@ rsffits2 <- rsffits %>%
 rsffits2
 
 #' We can do statistics on statistics now
-se<-function(x){sqrt(var(x))/length(x)}
+se<-function(x){sd(x)/sqrt(length(x))}
 statsonstats<-rsffits2 %>% group_by(sex, term) %>% 
   filter(term %in% c("elevation", "forest", "popden"))%>%
   summarize(mean=mean(estimate), se=se(estimate), n = n()) %>%
