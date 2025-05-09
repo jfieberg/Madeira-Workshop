@@ -20,15 +20,6 @@ The code below will look for the various packages that we will use during the wo
 
 
 ```{r}
-# install 'develop' version of momentuHMM
-install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"), dependencies = TRUE)
-
-# install aniMotum (not on cran)
-install.packages("aniMotum",
-                 repos = c("https://cloud.r-project.org",
-                 "https://ianjonsen.r-universe.dev"),
-                 dependencies = TRUE)
-
 # Install (or update) all other packages
 pkg.required <- c("amt",
                   "sf",
@@ -41,16 +32,8 @@ pkg.required <- c("amt",
                   "here",
                   "terra",
                   "moveHMM",
-                  "mitools",
-                  "conicfit",
-                  "ggspatial",
-                  "kableExtra",
-                  "geosphere",
-                  "here",
-                  "adehabitatLT",
-                  "terra",
-                  "tidyterra",
-                  "RTMB")
+                  "boot",
+                  "survival")
 
 
 pkg.available <- installed.packages()[, "Package"]
@@ -60,9 +43,10 @@ if (!all(pkg.required %in% pkg.available)) {
   install.packages(pkg.missing, dependencies = TRUE)
 } 
 
+# install 'develop' version of momentuHMM
+install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"), dependencies = TRUE)
 
-
-pkg.required <- append(pkg.required,c("momentuHMM", "aniMotum"))
+pkg.required <- append(pkg.required,"momentuHMM")
 sapply(pkg.required, require, character.only = TRUE)
 ```
  
@@ -91,7 +75,6 @@ fisher_trk <- make_track(fisherdat, x, y, t, crs = 4326) |>
 ```
 
 Resample the track to 10 minutes with a tolerance of 2 minutes.
-
 ```{r}
 fisher_trk <- fisher_trk |>
   track_resample(rate = minutes(10), tolerance = seconds(120)) 
@@ -168,35 +151,6 @@ elkData <- momentuHMM::prepData(trackData,coordNames=c("Easting","Northing"))
 # fit "double switch with covariates" model
 doubleSwitch2 <- momentuHMM::fitHMM(data=elkData,nbStates=2,Par0=list(step=stepPar0,angle=anglePar0),dist=list(step="gamma",angle="vm"),estAngleMean=list(angle=TRUE),stationary=TRUE)
 doubleSwitch2
-```
-
-### Test of aniMotum
-
-Test fitting a state-space model with data from package
-
-```{r}
-fit <- fit_ssm(ellie, vmax = 4, model = "crw", time.step = 24,
-               control = ssm_control(verbose = 0))
-grab(fit) %>% head()
-```
-
-# Test for crawlWrap multiple imputation
-
-Using data from the package.
-
-```{r}
-obsData <- miExample$obsData
-
-# error ellipse model
-err.model <- list(x= ~ ln.sd.x - 1, y =  ~ ln.sd.y - 1, rho =  ~ error.corr)
-
-# Fit crwMLE models to obsData and predict locations 
-# at default intervals for both individuals
-crwOut1 <- crawlWrap(obsData=obsData,
-         theta=c(4,0),fixPar=c(1,1,NA,NA),
-         err.model=err.model,attempts=100)
-
-MI_sims <- MIfitHMM(crwOut1, nSims = 4, fit = FALSE)
 ```
 
 ## Report versions of packages
