@@ -8,20 +8,14 @@ format:
 ---
 
 
-## Set up and load packages needed for the workshop
+## Load packages needed for the workshop
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ``` 
 
-The code below will look for the various packages that we will use during the workshop and make sure they are installed on your computer. 
-
-<!--- Please add any that are missing! --->
-
-
 ```{r}
-# Install (or update) all other packages
-pkg.required <- c("amt",
+packages <- c("amt",
                   "sf",
                   "tidyverse",
                   "lubridate",
@@ -33,21 +27,10 @@ pkg.required <- c("amt",
                   "terra",
                   "moveHMM",
                   "boot",
-                  "survival")
+                  "survival", 
+                  "momentuHMM")
 
-
-pkg.available <- installed.packages()[, "Package"]
-
-if (!all(pkg.required %in% pkg.available)) {
-  pkg.missing <- pkg.required[!pkg.required %in% pkg.available]
-  install.packages(pkg.missing, dependencies = TRUE)
-} 
-
-# install 'develop' version of momentuHMM
-install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"), dependencies = TRUE)
-
-pkg.required <- append(pkg.required,"momentuHMM")
-sapply(pkg.required, require, character.only = TRUE)
+sapply(packages, require, character.only = TRUE)
 ```
  
 

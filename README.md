@@ -33,7 +33,6 @@ Wednesday, May 21 (Day 3):
 - Introduction to step-selection analyses
 - Addressing individual variability using 2-step approaches and mixed-effect models
 - Model validation using simulations
-- Limitations of discrete-time approach
 
 Thursday, May 22 (Day 4):
 
@@ -75,27 +74,24 @@ b. If you are familiar with working with git and github, you can clone the repos
 
 ### Install packages and run test script
 
-
-<!--- This part still needs some work  
-
-The script `packages.R` in the `Organizing-Intro-Documents` subfolder can help you install and/or update the packages required for this workshop.  Please make sure to run it.
---->
+The script `PackagesInstall.R` in the `Organizing-Intro-Documents` subfolder can help you install and/or update the packages required for this workshop.  Please make sure to run it.
 
 Once you have downloaded the course materials, open Rstudio and create a project associated with the directory holding all the workshop files. `File -> New Project`, then select `Existing directory`, find the `Madeira-Workshop` directory` on your computer and click OK.
 
 Then, in Rstudio, open the `Test.qmd` file contained in the `Organizing-Intro-Documents` subfolder. Click `Render` (near the top of the screen in Rstudio).  This will:
 
 - Run the R code in the `Test.qmd` file
-- The code will install any missing packages and make sure your computer is ready to go for the workshop.
+- Ensure that your computer is ready to go for Monday when the workshop begins.
 
-If you are successful, this will create a `Test.hmtl` file in the same subdirectory (Organizing-Intro-Documents). Upload this file to [this google drive - still need to provide link](provide link here!) to demonstrate you are ready to go at the start of the workshop!
+If you are successful, this will create a `Test.hmtl` file in the same subdirectory (Organizing-Intro-Documents). Upload this file to [this google drive](https://drive.google.com/drive/folders/19PJ11vSP2bQ8ObEj12fP0y_CcWcI139I) to demonstrate you are ready to go at the start of the workshop!
 
+<!---
 
 ## Other Resources
 
 
 
-<!--- 
+ 
 **ESA Ecological Forecasting Initiative**: webinar on iSSA by Tal Avgar and Brian Smith. You can find a [recording of the webinar on YouTube](https://youtu.be/jiY9N-TNRjs). You can find the [lecture slides, R code, and Q&A on GitHub](https://github.com/eco4cast/Statistical-Methods-Seminar-Series/tree/main/avgar-smith_issa). You can find the Q&A markdown in the GitHub repo, or [just follow this link](https://github.com/eco4cast/Statistical-Methods-Seminar-Series/blob/main/avgar-smith_issa/Q_and_A.md).
 
 The webinar includes some coded examples of iSSFs that include interactions with the movement parameters that we did not demonstrate in this workshop.
