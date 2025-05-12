@@ -16,7 +16,7 @@ Let's load packages we will need.
 ```{r warning = FALSE, message = FALSE}
 library(amt)
 library(terra)
-librayr(tidyverse)
+library(tidyverse)
 library(here)
 ```
 
