@@ -136,6 +136,11 @@ doubleSwitch2 <- momentuHMM::fitHMM(data=elkData,nbStates=2,Par0=list(step=stepP
 doubleSwitch2
 ```
 
+Verify crawl and interpolation work
+```{r}
+utils::example("crawlWrap","momentuHMM",run.dontrun = TRUE)
+head(crwOut2$crwPredict[,c("ID","time","mu.x","mu.y","x","y","cov1","cov2")],7)
+```
 ## Report versions of packages
 
 ```{r}
