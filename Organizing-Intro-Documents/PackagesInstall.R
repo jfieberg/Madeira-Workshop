@@ -20,8 +20,9 @@ pkg.required <- c("amt",
                   "terra",
                   "moveHMM",
                   "boot",
-                  "survival")
-
+                  "survival",
+                  "ctmm",
+                  "remotes")
 
 pkg.available <- installed.packages()[, "Package"]
 
@@ -32,7 +33,9 @@ if (!all(pkg.required %in% pkg.available)) {
 
 # install 'develop' version of momentuHMM
 install.packages("momentuHMM", repos = c("https://bmcclintock.r-universe.dev", "https://cloud.r-project.org"), dependencies = TRUE)
+remotes::install_github("ecoisilva/movedesign")
 
-pkg.required <- append(pkg.required,"momentuHMM")
+pkg.required <- append(pkg.required, c("momentuHMM", "movedesign"))
+
 sapply(pkg.required, require, character.only = TRUE)
 
