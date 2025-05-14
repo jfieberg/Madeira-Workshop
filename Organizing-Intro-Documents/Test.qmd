@@ -16,19 +16,20 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 packages <- c("amt",
-                  "sf",
-                  "tidyverse",
-                  "lubridate",
-                  "TwoStepCLogit",
-                  "glmmTMB",
-                  "tictoc",
-                  "broom",
-                  "here",
-                  "terra",
-                  "moveHMM",
-                  "boot",
-                  "survival", 
-                  "momentuHMM")
+              "sf",
+              "tidyverse",
+              "lubridate",
+              "TwoStepCLogit",
+              "glmmTMB",
+              "tictoc",
+              "broom",
+              "here",
+              "terra",
+              "moveHMM",
+              "boot",
+              "survival", 
+              "momentuHMM",
+              "ctmm")
 
 sapply(packages, require, character.only = TRUE)
 ```
@@ -141,6 +142,40 @@ Verify crawl and interpolation work
 utils::example("crawlWrap","momentuHMM",run.dontrun = TRUE)
 head(crwOut2$crwPredict[,c("ID","time","mu.x","mu.y","x","y","cov1","cov2")],7)
 ```
+
+
+### Test for ctmm methods
+
+Read-in African buffalo (Syncerus caffer) data from Kruger National Park:
+
+```{r}
+data(buffalo)
+data_buffalo <- buffalo$Cilla[1:300, ] # first 300 rows to speed up run time
+```
+
+Calculate variogram:
+```{r}
+
+svf <- variogram(data_buffalo)
+plot(svf, level = c(0.5, 0.95)) #  with 50% and 95% CIs
+```
+
+Select best-fit movement model:
+
+```{r}
+guess_buffalo <- ctmm::ctmm.guess(data_buffalo, interactive = FALSE)
+fit_buffalo <- ctmm::ctmm.fit(data_buffalo, guess_buffalo)
+summary(fit_buffalo)
+```
+
+Run Autocorrelated Kernel density Estimation (AKDE):
+
+```{r}
+AKDE <- ctmm::akde(data_buffalo, fit_buffalo)
+summary(AKDE)
+plot(data_buffalo, UD = AKDE)
+```
+
 ## Report versions of packages
 
 ```{r}
