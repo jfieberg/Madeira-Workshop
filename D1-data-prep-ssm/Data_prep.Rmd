@@ -270,7 +270,9 @@ track_split_sf <- track_split %>%
   st_transform(2962) # reproject data to a UTM
 ```
 
-Now we can fit the CTCRW to each track segment and create a data frame of predicted locations. We decided above that a good, maybe conservative time interval was 30 min. We will use that interval here. Since interpolating when they are large data gaps can bias our analysis, we use the split tracks. 
+Now we can fit the CTCRW to each track segment and create a data frame of predicted locations. We decided above that a good, maybe conservative time interval was 30 min. We will use that interval here. Since interpolating when they are large data gaps can bias our analysis, we use the split tracks.
+
+The default model fitted is the simplest model. For example, it does not include the drift component described in Johnson et al. (2008) and we have not included covariates in the movement or error equations. 
 
 ```{r crawl_30_min_gps, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
 # crawl can fail to fit periodically, so I recommend always setting a seed 
@@ -280,10 +282,27 @@ set.seed(12)
 crwOut <- crawlWrap(obsData = track_split_sf, timeStep = "30 mins", theta = c(7, 0))
 ```
 
+Let's look at the output of the model for the first track.
+
+```{r crawl_par,attr.source = ".numberLines", message=FALSE, warning= FALSE}
+crwOut$crwFits$`T172062-1`
+
+exp(crwOut$crwFits$`T172062-1`$estPar)
+```
+
+We get the log likelihood value, the AIC value, and the estimated parameters. Here, the autocorrelation parameter, $\hat{\beta}$, is 1.11 and the variability parameter, $\hat{\sigma}$, is 3286. 
+
+The autocorrelation parameter represent how quickly the temporal correlation
+in velocity tends towards 0. According to Johnson et al (2008), if the time difference between two time steps is $\Delta = 3/\beta$, then the velocities are roughly independent. Here, this would be achieved in the following time (in hour):
+
+```{r crawl_time, attr.source = ".numberLines", message=FALSE, warning= FALSE}
+3/exp(crwOut$crwFits$`T172062-1`$estPar)[2]
+```
+
 Let's look at a few track segments with interpolated values.
 
 ```{r crawl_30_min_gps_plot, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
-plot(crwOut, animals = "T172062-3", ask = FALSE)
+plot(crwOut, animals = "T172062-1", ask = FALSE)
 plot(crwOut, animals = "T172064-5", ask = FALSE)
 plot(crwOut, animals = "T172066-4", ask = FALSE)
 ```
@@ -455,7 +474,7 @@ hist(gentoo_tracks$dt, 1000, main = NA, xlab = "Time difference (min)",
 
 Here we look at the time series of time differences for each individual.
 
-```{gentoo_dt_ts, attr.source = ".numberLines", fig.width = 10, fig.height = 4}
+```{r gentoo_dt_ts, attr.source = ".numberLines", fig.width = 10, fig.height = 4}
 ggplot() +
   geom_line(data = gentoo_tracks, aes(x = datetime, y = dt/60)) +
   facet_wrap(~ID) +
@@ -539,7 +558,7 @@ We also need to tell the function `fit_smm` which columns contain the id of the 
 
 The function `fit_ssm` applies some prefiltering before applying the state-space model for data. To see the default values for things like maximum travel rate and min allowable time difference, look at the help file (`?fit_ssm`).
 
-```{r ssm_gentoo_irregular, attr.source = ".numberLines"}
+```{r ssm_gentoo_irregular, attr.source = ".numberLines", message=FALSE, warning=FALSE}
 gentoo_mpi <- fit_ssm(gentoo_tracks,
                       id = "ID",
                       coord = c("Longitude", "Latitude"),
@@ -604,7 +623,7 @@ ggplot() +
 
 It is important to check whether the model is appropriate for the data. To do so, we can look at one-step ahead residuals. This will take a few minute to run.
 
-```{r osar, cache=TRUE}
+```{r osar, cache=TRUE, warning=FALSE, message=FALSE}
 res.crw <- osar(gentoo_mpi)
 plot(res.crw, type = "ts")
 plot(res.crw, type = "qq")
@@ -619,7 +638,7 @@ For some downstream analyses, we may need regularise tracks. As we saw above, it
 
 Again, we can use the function`fit_smm` from the package `aniMotum`. The only difference is that now we will include a time step of 4 hour.
 
-```{r ssm_gentoo_regular, attr.source = ".numberLines"}
+```{r ssm_gentoo_regular, attr.source = ".numberLines", message=FALSE, warning=FALSE}
 gentoo_mpr <- fit_ssm(gentoo_tracks,
                       id = "ID",
                       coord = c("Longitude", "Latitude"),
@@ -687,3 +706,6 @@ ggplot() +
 
 We can see the slightly different paths. Replicate of 0 is the original track produce by the state-space model.
 
+# Literature cited
+
+Johnson, DS, JM London, MA Lea, JW Durban. 2008. Continuous-time correlated random walk model for animal telemetry data. Ecology 89: 1208-1215
