@@ -270,7 +270,9 @@ track_split_sf <- track_split %>%
   st_transform(2962) # reproject data to a UTM
 ```
 
-Now we can fit the CTCRW to each track segment and create a data frame of predicted locations. We decided above that a good, maybe conservative time interval was 30 min. We will use that interval here. Since interpolating when they are large data gaps can bias our analysis, we use the split tracks. 
+Now we can fit the CTCRW to each track segment and create a data frame of predicted locations. We decided above that a good, maybe conservative time interval was 30 min. We will use that interval here. Since interpolating when they are large data gaps can bias our analysis, we use the split tracks.
+
+The default model fitted is the simplest model. For example, it does not include the drift component described in Johnson et al. (2008).
 
 ```{r crawl_30_min_gps, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
 # crawl can fail to fit periodically, so I recommend always setting a seed 
@@ -278,6 +280,12 @@ set.seed(12)
 
 # fit crawl
 crwOut <- crawlWrap(obsData = track_split_sf, timeStep = "30 mins", theta = c(7, 0))
+```
+
+Let's look at the output of the model for the first track.
+
+```{r}
+crwOut$crwFits$`T172062-1`
 ```
 
 Let's look at a few track segments with interpolated values.
@@ -687,3 +695,6 @@ ggplot() +
 
 We can see the slightly different paths. Replicate of 0 is the original track produce by the state-space model.
 
+# Literature cited
+
+Johnson, DS, JM London, MA Lea, JW Durban. 2008. Continuous-time correlated random walk model for animal telemetry data. Ecology 89: 1208-1215
