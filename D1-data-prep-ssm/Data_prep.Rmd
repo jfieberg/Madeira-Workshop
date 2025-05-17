@@ -272,7 +272,7 @@ track_split_sf <- track_split %>%
 
 Now we can fit the CTCRW to each track segment and create a data frame of predicted locations. We decided above that a good, maybe conservative time interval was 30 min. We will use that interval here. Since interpolating when they are large data gaps can bias our analysis, we use the split tracks.
 
-The default model fitted is the simplest model. For example, it does not include the drift component described in Johnson et al. (2008).
+The default model fitted is the simplest model. For example, it does not include the drift component described in Johnson et al. (2008) and we have not included covariates in the movement or error equations. 
 
 ```{r crawl_30_min_gps, attr.source = ".numberLines", message=FALSE, warning= FALSE, cache=TRUE, collapse=TRUE}
 # crawl can fail to fit periodically, so I recommend always setting a seed 
@@ -284,9 +284,13 @@ crwOut <- crawlWrap(obsData = track_split_sf, timeStep = "30 mins", theta = c(7,
 
 Let's look at the output of the model for the first track.
 
-```{r}
+```{r crawl_par,attr.source = ".numberLines", message=FALSE, warning= FALSE}
 crwOut$crwFits$`T172062-1`
+
+exp(crwOut$crwFits$`T172062-1`$estPar)
 ```
+
+We get the log likelihood value, the AIC value, and the estimated parameters. Here, the autocorelation parameter, $\hat{\beta}$, is 1.11 and the variability parameter, $\hat{\sigma}$, is 3286.
 
 Let's look at a few track segments with interpolated values.
 
