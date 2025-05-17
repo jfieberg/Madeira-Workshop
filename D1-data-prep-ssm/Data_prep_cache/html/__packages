@@ -9,8 +9,6 @@ dplyr
 stringr
 forcats
 lubridate
-terra
-tidyterra
 ggspatial
 sf
 kableExtra
@@ -19,10 +17,6 @@ pracma
 geigen
 conicfit
 here
-crawl
-foreach
-rngtools
-doRNG
 sp
 ade4
 adehabitatMA
@@ -30,5 +24,11 @@ MASS
 boot
 CircStats
 adehabitatLT
+terra
+tidyterra
 aniMotum
 mitools
+crawl
+foreach
+rngtools
+doRNG

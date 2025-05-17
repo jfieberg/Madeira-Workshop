@@ -474,7 +474,7 @@ hist(gentoo_tracks$dt, 1000, main = NA, xlab = "Time difference (min)",
 
 Here we look at the time series of time differences for each individual.
 
-```{gentoo_dt_ts, attr.source = ".numberLines", fig.width = 10, fig.height = 4}
+```{r gentoo_dt_ts, attr.source = ".numberLines", fig.width = 10, fig.height = 4}
 ggplot() +
   geom_line(data = gentoo_tracks, aes(x = datetime, y = dt/60)) +
   facet_wrap(~ID) +
@@ -558,7 +558,7 @@ We also need to tell the function `fit_smm` which columns contain the id of the 
 
 The function `fit_ssm` applies some prefiltering before applying the state-space model for data. To see the default values for things like maximum travel rate and min allowable time difference, look at the help file (`?fit_ssm`).
 
-```{r ssm_gentoo_irregular, attr.source = ".numberLines"}
+```{r ssm_gentoo_irregular, attr.source = ".numberLines", message=FALSE, warning=FALSE}
 gentoo_mpi <- fit_ssm(gentoo_tracks,
                       id = "ID",
                       coord = c("Longitude", "Latitude"),
@@ -623,7 +623,7 @@ ggplot() +
 
 It is important to check whether the model is appropriate for the data. To do so, we can look at one-step ahead residuals. This will take a few minute to run.
 
-```{r osar, cache=TRUE}
+```{r osar, cache=TRUE, warning=FALSE, message=FALSE}
 res.crw <- osar(gentoo_mpi)
 plot(res.crw, type = "ts")
 plot(res.crw, type = "qq")
@@ -638,7 +638,7 @@ For some downstream analyses, we may need regularise tracks. As we saw above, it
 
 Again, we can use the function`fit_smm` from the package `aniMotum`. The only difference is that now we will include a time step of 4 hour.
 
-```{r ssm_gentoo_regular, attr.source = ".numberLines"}
+```{r ssm_gentoo_regular, attr.source = ".numberLines", message=FALSE, warning=FALSE}
 gentoo_mpr <- fit_ssm(gentoo_tracks,
                       id = "ID",
                       coord = c("Longitude", "Latitude"),
