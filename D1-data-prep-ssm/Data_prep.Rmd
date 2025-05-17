@@ -290,9 +290,10 @@ crwOut$crwFits$`T172062-1`
 exp(crwOut$crwFits$`T172062-1`$estPar)
 ```
 
-We get the log likelihood value, the AIC value, and the estimated parameters. Here, the autocorelation parameter, $\hat{\beta}$, is 1.11 and the variability parameter, $\hat{\sigma}$, is 3286.
+We get the log likelihood value, the AIC value, and the estimated parameters. Here, the autocorrelation parameter, $\hat{\beta}$, is 1.11 and the variability parameter, $\hat{\sigma}$, is 3286. 
 
-According to Johnson et al (2008), if the time difference between two time steps is $\Delta = 3/\beta$, then the velocities are roughly independent. Here, this would be achieved in the following time (in hour):
+The autocorrelation parameter represent how quickly the temporal correlation
+in velocity tends towards 0. According to Johnson et al (2008), if the time difference between two time steps is $\Delta = 3/\beta$, then the velocities are roughly independent. Here, this would be achieved in the following time (in hour):
 
 ```{r crawl_time, attr.source = ".numberLines", message=FALSE, warning= FALSE}
 3/exp(crwOut$crwFits$`T172062-1`$estPar)[2]
