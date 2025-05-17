@@ -97,3 +97,11 @@ ggplot() +
                     aes(x = Longitude, y = Latitude, color = ID), 
                     crs = 4326)
 ```
+
+Here we are going to fit a state-space model similar to the one used in `aniMotum`. We are going to follow the general set up of the supplementary material associated with the Auger-Méthé et al. 2021 paper. However, here we are going to use `RTMB` rather than `TMB`.
+
+
+
+# Fitting a movement state-space model with `RTMB`.
+
+
