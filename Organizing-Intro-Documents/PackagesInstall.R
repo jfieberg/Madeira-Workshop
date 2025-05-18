@@ -24,7 +24,8 @@ pkg.required <- c("amt",
                   "ctmm",
                   "remotes",
                   "viridis",
-                  "patchwork")
+                  "patchwork",
+                  "readr")
 
 pkg.available <- installed.packages()[, "Package"]
 
