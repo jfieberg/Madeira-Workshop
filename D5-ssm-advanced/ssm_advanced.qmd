@@ -1,0 +1,107 @@
+---
+title: "Building state-space models"
+format: html
+editor: visual
+---
+
+<!-- To be able to have continuous line numbers -->
+```{=html}
+<style>
+body
+{ counter-reset: source-line 0; }
+pre.numberSource code
+{ counter-reset: none; }
+</style>
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Tutorial goals
+
+The goal of this tutorial is to start exploring how one can write your one state-space modela.
+
+The primary learning objectives are to:
+
+1. Use `RTMB` to write a simple state-space model.
+2. Use `rstan` to write a simple state-space model.
+
+
+# General setup
+
+First, let's load the packages that we will need to complete the analyses. 
+Of course you need to have them installed first.
+
+```{r Load packages, attr.source = ".numberLines", message = FALSE, warning = FALSE}
+library(tidyverse)  # data management
+library(ggspatial)  # plot the data
+library(sf)         # spatial data processing
+library(here)       # To help with sourcing
+# library(terra)
+# library(tidyterra)
+library(RTMB)
+library(rstan)
+```
+
+
+## Gentoo movement data
+
+We will analyze a dataset containing movement tracks of three gentoo penguins tagged with Argos tags. The dataset belongs to Dr. Marie Auger-Méthé (University of British Columbia) and Dr. Glenn Crossin (Dalhousie University). They provided the data only for this tutorial, please do not use for other purposes without their consent. Contact: auger-methe@stat.ubc.ca.
+
+This is the same data as the data we explored on the first day. See the first day tutorial for more information on the time intervals.
+
+Let's load the data.
+
+```{r load_gentoo, attr.source = ".numberLines"}
+gentoo_tracks <- read.csv(
+  here("D1-data-prep-ssm", "data", "tracks_argos_gentoo.csv")) %>%
+  mutate(ID = factor(ID),
+         datetime = ymd_hms(datetime))
+  
+head(gentoo_tracks)
+```
+
+The columns/variables are:
+- `ID`: Individual identifier
+- `datetime`: time of location
+- `Longitude`: longitude
+- `Latitude`: latitude
+- `Qual`: Argos location quality, one of 0, 1, 2, 3, A, B
+
+There is often duplicates and records (rows) with missing data. We want to remove any row that is missing latitude or longitude or location quality and duplicates.
+
+```{r clean_gentoo, attr.source = ".numberLines"}
+gentoo_tracks <- gentoo_tracks %>% 
+  filter(!is.na(Longitude) & !is.na(Latitude) & Qual != "",
+         # remove identical records
+         !(datetime == lag(datetime) & 
+             Longitude == lag(Longitude) & 
+             Latitude == lag(Latitude) & 
+             Qual == lag(Qual)))
+```
+
+Here, the data are already sorted in order of ID and datetime, but this is not always the case. It's a good habit to sort them appropriately.
+
+```{r order_gentoo, attr.source = ".numberLines"}
+gentoo_tracks <- gentoo_tracks %>% arrange(ID, datetime)
+```
+
+Let's plot the data. Here, the coordinate system is WGS83 (i.e., regular lat/lon), so we use `crs = 4326`.
+
+```{r plot_raw_gentoo, attr.source = ".numberLines", warning=FALSE}
+ggplot() +
+  geom_spatial_path(data =  gentoo_tracks, 
+                    aes(x = Longitude, y = Latitude, color = ID), 
+                    crs = 4326)
+```
+
+Here we are going to fit a state-space model similar to the one used in `aniMotum`. We are going to follow the general set up of the supplementary material associated with the Auger-Méthé et al. 2021 paper. However, here we are going to use `RTMB` rather than `TMB`.
+
+
+
+# Fitting a movement state-space model with `RTMB`.
+
+
