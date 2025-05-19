@@ -101,10 +101,11 @@ head(tracks_gps_O)
 ```
 
 The columns/variables are:
+
 - `ID`: Individual identifier
 - `time`: time of location
 - `x`: longitude
-- `y`: latiture
+- `y`: latitude
 - `loc_class`: all GPS
 
 The data we obtain is often quite messy with some rows/records missing information and other records duplicated. We can filter records to keep only complete location data using `!is.na(x) & !is.na(y)`. To remove duplicate records (same time, location, and location class), we will use the `lag` function from `dplyr`, which will use the value from the previous row so that we can compare to the current row.
