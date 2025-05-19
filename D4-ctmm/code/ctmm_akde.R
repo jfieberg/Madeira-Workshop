@@ -11,7 +11,7 @@ library(ctmm)
 library(here)
 
 # Load pre-run objects:
-load(here::here("D3-ctmm", "data", "hr.rda"))
+load(here::here("D4-ctmm", "data", "hr.rda"))
 
 # Data preparation: -------------------------------------------------------
 
@@ -158,7 +158,7 @@ fit2_boot <- ctmm.boot(data_gazelle, fit2, error = 0.01, trace = 2)
 ( total_time <- Sys.time() - start_time )
 # Time difference of 43.93944 mins
 
-load(here::here("D3-ctmm", "data", "hr_bootstrap.rda"))
+load(here::here("D4-ctmm", "data", "hr_bootstrap.rda"))
 summary(fit2_boot)
 
 1/summary(fit2_boot)$DOF["area"]^3 # expected order of bias
@@ -194,7 +194,7 @@ par(mfrow = c(1, 1))
 # Population-level inferences: --------------------------------------------
 
 # Load pre-run objects:
-load(here::here("D3-ctmm", "data", "meta.RData"))
+load(here::here("D4-ctmm", "data", "meta.RData"))
 
 # Fit movement models for all individuals:
 start_time <- Sys.time()

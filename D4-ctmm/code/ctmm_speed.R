@@ -34,7 +34,7 @@ plot(data_buffalo, col = color(data_buffalo, by = "time"), error = FALSE)
 guess <- ctmm.guess(data_buffalo, interactive = FALSE)
 fit <- ctmm.select(data_buffalo, guess, trace = 2)
 # or load model fits from ctmm.select():
-load(here::here("D3-ctmm", "data", "fit_buffalo_cilla.rda"))
+load(here::here("D4-ctmm", "data", "fit_buffalo_cilla.rda"))
 fit <- fitList[[1]]
 
 # Speed estimate here is RMS Gaussian:
@@ -75,7 +75,7 @@ speed(SUB, fit.SUB)
 help("meta")
 
 # Load in the fitted movement models:
-load(here::here("D3-ctmm", "data", "fits_buffalo.rda"))
+load(here::here("D4-ctmm", "data", "fits_buffalo.rda"))
 
 # Estimate mean spead for each animal:
 ctsdList <- list()
@@ -84,7 +84,7 @@ for (i in seq_along(length(buffalo))) {
 }
 names(ctsdList) <- names(buffalo)
 # save(ctsdList, file = here::here("data", "speeds_buffalo.rda"))
-load(here::here("D3-ctmm", "data", "speeds_buffalo.rda"))
+load(here::here("D4-ctmm", "data", "speeds_buffalo.rda"))
 
 meta(ctsdList, sort = TRUE)
 
