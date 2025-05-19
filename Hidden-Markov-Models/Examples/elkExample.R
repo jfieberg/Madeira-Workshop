@@ -45,4 +45,6 @@ doubleSwitchCovs <- moveHMM::fitHMM(data=elkData,nbStates=2,stepPar0=stepPar0,an
 AIC(doubleSwitch,doubleSwitchCovs)
 
 plot(doubleSwitchCovs,ask=FALSE)
-plotPR(doubleSwitchCovs)
+moveHMM::plotPR(doubleSwitchCovs)
+
+save.image("Results/elkExample.RData")

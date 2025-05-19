@@ -1,14 +1,12 @@
 library(momentuHMM)
-library(setRNG)
 
 # set seed
-oldRNG<-setRNG::setRNG()
-setRNG::setRNG(kind="L'Ecuyer-CMRG",normal.kind="Inversion",seed=30)
+set.seed(30,kind="L'Ecuyer-CMRG",normal.kind="Inversion")
 
 # load nfs data from github
 load(url("https://raw.github.com/bmcclintock/momentuHMM/master/vignettes/nfsData.RData"))
 
-nSims <- 100 # number of imputatons
+nSims <- 28 # number of imputatons
 retryFits <- 30 # number attempt to re-fit based on random perturbation
 ncores <- 7 # number of CPU cores
 
@@ -79,6 +77,4 @@ nfsFits <- MIfitHMM(crwOut, nSims = nSims, ncores = ncores, nbStates = nbStates,
                     stateNames=stateNames)
 plot(nfsFits,legend.pos="topright")
 
-save.image("nfsExample.RData")
-
-setRNG::setRNG(oldRNG)
+save.image("Results/nfsExample.RData")

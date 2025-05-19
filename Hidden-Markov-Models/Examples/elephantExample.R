@@ -28,7 +28,7 @@ crwOut<-crawlWrap(rawData,timeStep="hour",theta=c(6.855, -0.007),fixPar=c(NA,NA)
 plot(crwOut,ask=FALSE)
 
 # create momentuHMMData object from crwData object
-elephantData <- prepData(data=crwOut, covNames="temp")
+elephantData <- momentuHMM::prepData(data=crwOut, covNames="temp")
 
 # add cosinor covariate based on hour of day
 elephantData$hour <- as.integer(strftime(elephantData$time, format = "%H", tz="GMT"))
@@ -45,7 +45,7 @@ dist = list(step = "gamma", angle = "wrpcauchy")
 Par0_m1 <- list(step=c(100,500,100,200),angle=c(0.3,0.7))
 
 # fit model
-m1 <- fitHMM(data = elephantData, nbStates = 2, dist = dist, Par0 = Par0_m1, 
+m1 <- momentuHMM::fitHMM(data = elephantData, nbStates = 2, dist = dist, Par0 = Par0_m1, 
              estAngleMean = list(angle=FALSE), stateNames = stateNames)
 
 
@@ -56,7 +56,7 @@ formula <- ~ temp * cosinor(hour, period = 24)
 Par0_m2 <- getPar0(model=m1, formula=formula)
 
 # fit model
-m2 <- fitHMM(data = elephantData, nbStates = 2, dist = dist, Par0 = Par0_m2$Par, 
+m2 <- momentuHMM::fitHMM(data = elephantData, nbStates = 2, dist = dist, Par0 = Par0_m2$Par, 
              beta0=Par0_m2$beta, stateNames = stateNames, formula=formula)
 
 
@@ -69,7 +69,7 @@ DM <- list(step = list(mean = ~ temp * cosinor(hour, period = 24),
 Par0_m3 <- getPar0(model=m2, formula=formula, DM=DM)
 
 # fit model
-m3 <- fitHMM(data = elephantData, nbStates = 2, dist = dist, Par0 = Par0_m3$Par, 
+m3 <- momentuHMM::fitHMM(data = elephantData, nbStates = 2, dist = dist, Par0 = Par0_m3$Par, 
              beta0 = Par0_m3$beta, DM = DM, stateNames = stateNames,
              formula = formula)
 
@@ -77,9 +77,9 @@ m3 <- fitHMM(data = elephantData, nbStates = 2, dist = dist, Par0 = Par0_m3$Par,
 AIC(m1,m2,m3)
 
 # decode most likely state sequence
-states <- viterbi(m3)
+states <- momentuHMM::viterbi(m3)
 # derive percentage of time spent in each state
-table(states)/nrow(elephantData)
+timeInStates(m3)
 
 # plot results for model m3
 plot(m3, plotCI = TRUE, covs = data.frame(hour=12))
@@ -89,9 +89,9 @@ plot(m3, plotCI = TRUE, covs = data.frame(hour=12))
 # plotSat(m3,zoom=8,col=c("firebrick3","seagreen4"),projargs = proj4string(utmcoord),ask=FALSE)
 
 # compute pseudo-residuals for the steps and the angles
-pr <- pseudoRes(m3)
+pr <- momentuHMM::pseudoRes(m3)
 
 # plot the ACF of step pseudo-residuals
 acf(pr$stepRes[!is.na(pr$stepRes)],lag.max = 300)
 
-save.image("elephantExample.RData")
+save.image("Results/elephantExample.RData")
