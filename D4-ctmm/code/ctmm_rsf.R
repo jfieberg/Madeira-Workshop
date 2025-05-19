@@ -13,7 +13,7 @@ library(here)
 ## 1. Read data: ----------------------------------------------------------
 
 # Load lowland tapir movement dat and tree cover raster:
-load(here::here("D3-ctmm", "data", "tapir.rda"))
+load(here::here("D4-ctmm", "data", "tapir.rda"))
 length(tapir) # 29 individuals
 
 # Select first individual:
@@ -42,7 +42,7 @@ summary(fit)
 
 # Save fitted model:
 # save(fit, file = here::here("data", "fit_tapir-iso.rda"))
-load(here::here("D3-ctmm", "data", "fit_tapir-iso.rda"))
+load(here::here("D4-ctmm", "data", "fit_tapir-iso.rda"))
 
 # 3. Run Autocorrelated Kernel Density Estimate (AKDE): -------------------
 
@@ -75,7 +75,7 @@ plot(dat$timestamp,
 # iRSF with autocorrelation:
 RSF <- rsf.fit(dat, AKDE, R = R)
 # save(RSF, file = here::here("data", "rsf_tapir.rda"))
-load(here::here("D3-ctmm", "data", "rsf_tapir.rda"))
+load(here::here("D4-ctmm", "data", "rsf_tapir.rda"))
 summary(RSF)
 
 # with faster integration method (if you don’t need time-dependent model)

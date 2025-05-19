@@ -9,7 +9,7 @@
 
 library(ctmm)
 
-load(here::here("D3-ctmm", "data", "occurrence.rda"))
+load(here::here("D4-ctmm", "data", "occurrence.rda"))
 
 # Data preparation: -------------------------------------------------------
 
@@ -116,7 +116,7 @@ par(mfrow = c(1, 1))
 #      cilla_od,
 #      cilla_bbmm,
 #      cilla_hr,
-#      file = here::here("D3-ctmm", "data", "occurrence.rda"))
+#      file = here::here("D4-ctmm", "data", "occurrence.rda"))
 
 # range area = predicted space use, given the same behaviors
 # occurrence area = uncertainty (sampling dependent and limited to the sampling period)

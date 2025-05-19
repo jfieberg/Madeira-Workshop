@@ -167,7 +167,7 @@ guess <- ctmm.guess(data_turtle,
 fitList <- ctmm.select(data_turtle, guess, verbose = TRUE, trace = 2)
 # Note: argument 'verbose = TRUE' returns all candidate models
 # save(fitList, file = here::here("data","fits_turtle.rda"))
-load(here::here("D3-ctmm", "data", "fits_turtle.rda"))
+load(here::here("D4-ctmm", "data", "fits_turtle.rda"))
 
 # Look at all models:
 summary(fitList)
@@ -235,7 +235,7 @@ guess <- ctmm.guess(turtle[[3]],
                     CTMM = ctmm(error = TRUE), interactive = FALSE)
 fit_prior <- ctmm.select(turtle[[3]], guess, trace = 2)
 # save(fit_prior, file = here::here("data", "fit_turtle-prior.rda"))
-load(here::here("D3-ctmm", "data", "fit_turtle-prior.rda"))
+load(here::here("D4-ctmm", "data", "fit_turtle-prior.rda"))
 
 summary(fit_prior)
 summary(prior) # compare update to prior

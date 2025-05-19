@@ -136,7 +136,7 @@ help("ctmm.select")
 fitList <- ctmm.select(data_buffalo, guess, trace = 2, verbose = TRUE)
 # current candidate models: OUF, OUf, OUΩ, IOU, BM, IID
 # save(fitList, file = here::here("data", "fit_buffalo_cilla.rda"))
-load(here::here("D3-ctmm", "data", "fit_buffalo_cilla.rda"))
+load(here::here("D4-ctmm", "data", "fit_buffalo_cilla.rda"))
 
 # Summarize results:
 summary(fitList)
