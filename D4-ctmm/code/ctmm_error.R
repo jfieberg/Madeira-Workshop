@@ -8,6 +8,7 @@
 ###########################################################################
 
 library(ctmm)
+library(here)
 
 # Workflow: --------------------------------------------------------------
 
@@ -18,7 +19,7 @@ library(ctmm)
 #' Calibration data can be collected or opportunistic.
 #' Without calibration data, you should supply a prior.
 
-#' IF YOUR data_turtle NEEDS CALIBRATION:
+#' IF YOUR DATA NEEDS CALIBRATION:
 #' STEP C: What columns do you have in your data?
   #' DOP values? (HDOP, VDOP, PDOP, GDOP, ...)
   #' location classes?

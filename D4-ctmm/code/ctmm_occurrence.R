@@ -8,6 +8,7 @@
 ###########################################################################
 
 library(ctmm)
+library(here)
 
 load(here::here("D4-ctmm", "data", "occurrence.rda"))
 

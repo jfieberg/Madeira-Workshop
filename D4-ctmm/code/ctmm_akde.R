@@ -8,6 +8,7 @@
 ###########################################################################
 
 library(ctmm)
+library(ggplot2)
 library(here)
 
 # Load pre-run objects:
@@ -39,11 +40,11 @@ xlim <- c(0, 1 %#% "day") # to create a window of one day
 
 # Checking for the range residency assumption:
 svf1 <- variogram(data_buffalo)
-par(mfrow = c(1,2))
+par(mfrow = c(1, 2))
 plot(svf1, fraction = 0.5, level = level)
 abline(v = 1, col = "red", lty = 2) # adding a line at ~one month
 plot(svf1, xlim = xlim, level = level)
-par(mfrow = c(1,1))
+par(mfrow = c(1, 1))
 
 # Model selection: --------------------------------------------------------
 # Selecting the best-fit movement model through model selection:
@@ -194,7 +195,7 @@ par(mfrow = c(1, 1))
 # Population-level inferences: --------------------------------------------
 
 # Load pre-run objects:
-load(here::here("D4-ctmm", "data", "meta.RData"))
+load(here::here("D4-ctmm", "data", "meta.rda"))
 
 # Fit movement models for all individuals:
 start_time <- Sys.time()

@@ -8,7 +8,7 @@
 ###########################################################################
 
 library(ctmm)
-library(ggplot2)
+library(here)
 
 # Help files & vignettes:
 help(package = "ctmm")
