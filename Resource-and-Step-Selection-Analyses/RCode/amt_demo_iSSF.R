@@ -43,7 +43,7 @@ plot(hab)
 #' timestamps are also possible (`track_xy`).
 
 #' We can format our data as a `track_*` object using `make_track()`.
-trk <- make_track(gps, .x = x, .y = y, t. = t, crs = 32612)
+trk <- make_track(gps, .x = x, .y = y, .t = t, crs = 32612)
 
 #' We can see the class of the resulting object
 class(trk)
