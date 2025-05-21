@@ -5,6 +5,7 @@ editor: visual
 ---
 
 <!-- To be able to have continuous line numbers -->
+
 ```{=html}
 <style>
 body
@@ -14,26 +15,22 @@ pre.numberSource code
 </style>
 ```
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
 # Tutorial goals
 
-The goal of this tutorial is to start exploring how one can write your one state-space modela.
+The goal of this tutorial is to start exploring how one can write your one state-space model.
 
 The primary learning objectives are to:
 
-1. Use `RTMB` to write a simple state-space model.
-2. Use `rstan` to write a simple state-space model.
-
+1.  Use `RTMB` to write a simple state-space model.
+2.  Use `rstan` to write a simple state-space model.
 
 # General setup
 
-First, let's load the packages that we will need to complete the analyses. 
-Of course you need to have them installed first.
+First, let's load the packages that we will need to complete the analyses. Of course you need to have them installed first.
 
 ```{r Load packages, attr.source = ".numberLines", message = FALSE, warning = FALSE}
 library(tidyverse)  # data management
@@ -46,14 +43,277 @@ library(RTMB)
 library(rstan)
 ```
 
+# Introducing the method with a toy state-space model
+
+## Model
+
+We start with a simple state-space model (SSM). This model is not linked to an ecological example; it's just a teaching tool. 
+It is a linear SSM with normal error distributions that consists of two equations for two time series.
+
+The process equation is:
+\begin{equation}
+  z_t = z_{t-1} + \epsilon_t, \;\;\; \epsilon_t \sim \text{N}(0, \sigma_p^2),
+  \label{E.toy2p.p} 
+\end{equation}
+where $z_t$ is the state value at time $t$, for $t=1, ..., T$. The states are generally unknown, i.e., cannot be observed directly, and are sometimes referred to as latent states. This equation represents the evolution of the hidden state as a random walk. The equation implies that there is some process variation and is here described by a Normal distribution with standard deviation $\sigma_p$. For simplicity, we set the initial state value to be 0, i.e., $z_0 =0$.
+
+The observation equation is:
+\begin{equation}
+  y_t = z_{t} + \eta_t, \;\;\; \eta_t \sim \text{N}(0, \sigma_o^2),
+  \label{E.toy2p.o}
+\end{equation}
+where $y_t$ is the observation at time $t$, for $t=1, ..., T$. This equation links the observation at time $t$ to the underlying state at that time. The equation implies that there are observation error and, here, is described by a Normal distribution with standard deviation $\sigma_o$.
+
+This model has two parameters: $\sigma_o, \sigma_p$.
+
+## Simulated data
+
+To first explore how TMB works, we will use data simulated from this model.
+
+First, let us simulate the process for a time series of length 200 ($T=200$), with an additional time step for the state at $t=0$. To be consistent with the model description, we set to $z_0 = 0$. We choose the standard deviation of the process variation, $\sigma_p$, to be 0.1.
+
+```{r process.sim, tidy=FALSE}
+# Create a vector that will keep track of the states
+# It's of length T + 1 (+1 for t=0)
+# T is not a good name in R, because of T/F, so we use TT
+TT <- 200
+z <- numeric(TT + 1)
+# Standard deviation of the process variation
+sdp <- 0.1
+# Set the seed, so we can reproduce the results
+set.seed(553)
+# For-loop that simulates the state through time, using i instead of t,
+for(i in 1:TT){
+  # This is the process equation
+  z[i+1] <- z[i] + rnorm(1, 0, sdp)
+  # Note that this index is shifted compared to equation in text,
+  # because we assume the first value to be at time 0
+}
+```
+
+Let us plot the time series we have created.
+
+```{r process.sim.fig}
+plot(0:TT, z,
+     pch = 19, cex = 0.7, col="red", ty = "o", 
+     xlab = "t", ylab = expression(z[t]), las=1)
+```
+
+Second, let us simulate the observations. We set the standard deviation of the observation error $\sigma_o$ to 0.1.
+
+```{r obs.sim, tidy=FALSE}
+# Create a vector that will keep track of the observations
+# It's of length T
+y <- numeric(TT)
+# Standard deviation of the observation error
+sdo <- 0.1
+# For t=1, ... T, add measurement error
+# Remember that z[1] is t=0
+y <- z[2:(TT+1)] + rnorm(TT, 0, sdo)
+```
+
+Let us plot both the observations and the states. From now on, we are adding extra space on the y-axis to leave space for the legend. Note that the space we assigned may not work for all figure sizes.
+
+```{r obs.sim.fig, tidy=FALSE}
+plot(1:TT, y,
+     pch=3, cex = 0.8, col="blue", ty="o", lty = 3,
+     xlab = "t", ylab = expression(z[t]),
+     xlim = c(0,TT), ylim = c(min(y), max(y)+max(y)/5),
+     las = 1)
+points(0:TT, z,
+       pch = 19, cex = 0.7, col="red", ty = "o")
+legend("top",
+       legend = c("Obs.", "True latent states"),
+       pch = c(3, 19),
+       col = c("blue", "red"),
+       lty = c(3, 1),
+       horiz=TRUE, bty="n", cex=0.9)
+```
+
+With real data, we usually only have the observations, $y_t$, and do not know the true states, $z_t$. However, simulated data allow us to see the discrepancies between the observed values and the values for the process they represent.
+
+## Fitting the model using TMB
+
+In TMB you need to create a C++ file that computes the value of the negative log likelihood for your data and for a given set of parameter values. Then, you compile the C++ code using `TMB` and use that function in one of R's optimizers to find the minimum negative log likelihood. The beauty of `TMB` is that it uses the Laplace approximation to integrate over the states and computes the gradient efficiently, which speeds up the optimizing process.
+
+
+### Writing the negative log-likelihood function in C++
+
+Now, let us create the negative log-likelihood function that we will minimize (equivalent of maximizing the likelihood). We write this function in a special TMB C++ language. The code for the function needs to be saved in a text file. We usually give it the extension .cpp. You can do this directly in R Studio. You write the code just as you would write a separate R script, but you save it as a C++ file by giving it the .cpp extension.
+
+We name the file **toy2p.cpp** and it will contain the following code. Note that in C++, comments are preceded by // or contained within /* */. Also, as explained below, here the code is a little bit more complex than strictly necessary. We have included code that allow us to compute the one-step-ahead residuals and simulate from the model. While these features are not always necessary, they are key to model checking and thus we believe they should be part of all model fitting workflow.
+
+```{r toy2p, tidy=FALSE}
+# Define main function
+toy2p <- function(parms, data){
+  getAll(dataTmb, parms, warn=FALSE)
+  ## Optional (enables extra RTMB features)
+  # Tells RTMB that it's the response
+  y <- OBS(y)
+
+  # Specify the parameters transformation
+  # Transform standard deviations
+  # exp(par) is a trick to make sure that the estimated sd > 0
+  sdp <- exp(logSdP)
+  sdo <- exp(logSdO)
+  
+  ## Initialize joint negative log likelihood
+  nll <- 0.0
+
+  # Calculate the contribution to the negative log-likelihood
+  # of the process equation for t=1,...,T
+  # Remember that we fixed z_0 = 0
+  for(i in 2:length(z)){
+    nll <- nll - dnorm(z[i], mean=z[i-1], sd=sdp, log=TRUE)
+  }
+  
+  
+   
+  
+
+  # Calculate the contribution to the negative log-likelihood
+  # of the observation equation for t=1,...,T
+  # Remember, the first element of z is at t=0,
+  # while the first element of y is at t=1
+  for(i in 1:length(y)){
+    nll <- nll - dnorm(y[i], mean=z[i+1], sd=sdo, log=TRUE)
+  }
+  
+   
+    
+  # State the transformed parameters to report
+  # Using ADREPORT will return the point values and the standard errors
+  # Note that we only need to specify this for parameters
+  # we transformed, see section D above
+  # The other parameters, including the random effects (states),
+  # will be returned automatically
+  ADREPORT(sdp)
+  ADREPORT(sdo)
+
+   #State that we want the negative log-likelihood to be returned
+  #This is what the optimizer in R will minimize
+  return(nll)
+  
+}
+```
+
+### Preparing the model for fitting
+
+First, we need to prepare the data. This is going to be a list with all the items found in the .cpp files that are of the type `DATA` (e.g., `DATA_VECTOR`). Here, we only have `y` which is the time series of observed values.
+
+```{r prepY}
+dataTmb <- data.frame(y = y)
+```
+
+Second, we need a list with the parameters. Again the names need to match those in the .cpp file. These are the starting values for the parameters. Note that this includes both the parameters and the states.
+
+```{r parPrep, tidy=FALSE}
+par2pTmb <- list(logSdP = 0, logSdO = 0,
+             z=rep(0, length(dataTmb$y)+1))
+```
+
+By default all values of `par2pTmb` will be estimated, but we assume that we know the value of the state at time 0, $z_0 = 0$. To provide this information, we can create a named list that we will input for the argument `map` of the function `MakeADFun` below. The elements of `map` should have the same name and size as those in `par2pTmb`, but we only need to specify the elements that we want to manipulate, here `par2pTmb$z`. To fix a value, we set that value to `NA`. The values that are estimated should have a different entry and all values should be factors.
+
+```{r tmbMapPrep}
+mapTmb <- list(z=as.factor(c(NA,1:length(dataTmb$y))))
+```
+
+Before we can fit the model, we need to use the function `MakeADFun` to combine the data, the parameters, and the model and create a function that calculates the negative
+log likelihood and the gradients. 
+
+To identify our random effects, namely the states, $z_t$, we set the argument `random` to equal the name of the parameters that are random effects. The argument `DLL` identify the compiled C++ function to be linked.
+
+```{r MakeADFun, tidy=FALSE}
+m2pTmb <- RTMB::MakeADFun(toy2p, 
+                    parameters = par2pTmb, 
+                    map = mapTmb, 
+                    random = "z")
+
+```
+
+### Fitting the model to data
+
+We fit the model using `nlminb`, which is a base R optimizer, but we input the object returned by `MakeADFun`.
+
+```{r tmbOpt, tidy=FALSE, cache=TRUE}
+f2pTmb <- nlminb(start = m2pTmb$par, # Initial values for the parameters
+                 objective = m2pTmb$fn, # Function to be minimized
+                 gradient = m2pTmb$gr) # Gradient of the objective
+```
+
+It is important to check whether the model converged.
+
+```{r}
+f2pTmb$message
+```
+
+A message stating `"both X-convergence and relative convergence (5)"` would also indicate convergence.
+
+### Exploring the results
+
+To look at the parameter estimates, you can use the function `sdreport` and object object created by `MakeADFun`.
+
+```{r tmbEst, tidy=FALSE}
+sdr2pTmb <- summary(sdreport(m2pTmb))
+# This will have the parameters and states
+# So we can just print the parameters
+cbind("Simulated" = c(sdp, sdo),
+  sdr2pTmb[c("sdp", "sdo"),])
+```
+
+We can see that the estimates for both the process variation and the observation error are close to their true value of 0.1, with relatively small standard errors (SEs).
+
+We can get the smoothed state values with the `sdreport` function as above and this will give you the SEs for these states. If you are only interested in the state values (not theis SEs), you can also extract them directly from the model object.
+
+```{r toy.states.est, tidy=FALSE, cache=TRUE}
+# To get the point estimate and the SE of the states
+zsSe2pTmb <- sdr2pTmb[row.names(sdr2pTmb)=="z",]
+head(zsSe2pTmb)
+# To get only the point estimates of the states
+zs2pTmb <- m2pTmb$env$parList()$z
+head(zs2pTmb)
+```
+
+Note that in this case, because we fixed the value of the state at time $t=0$, the first method, which looks at the predicted values, only returns state values for $t>0$.
+
+We can use the SEs to calculate the 95\% confidence intervals.
+
+```{r tmbCI, tidy=FALSE}
+zsCIl2pTmb <- zsSe2pTmb[,1] + 
+  qnorm(0.025, sd = zsSe2pTmb[,2])
+zsCIu2pTmb <- zsSe2pTmb[,1] + 
+  qnorm(0.975, sd = zsSe2pTmb[,2])
+```
+
+We can now overlay the state estimates along with their confidence intervals on the plot of the simulated data.
+
+```{R tmbRp, tidy=FALSE}
+plot(1:TT, y,
+     pch=3, cex=0.8, col="blue", ty="o", lty = 3,
+     xlab = "t", ylab = expression(z[t]),
+     xlim = c(0,TT), ylim = c(min(y), max(y)+max(y)/5),
+     las = 1)
+points(0:TT, z,
+       pch=19, cex=0.7, col = "red", ty="o")
+polygon(c(1:TT, TT:1), c(zsCIl2pTmb,rev(zsCIu2pTmb)),
+        col=rgb(1,0.7,0.4,0.3), border=FALSE)
+lines(0:TT, zs2pTmb, 
+      col= "darkgoldenrod1", lwd = 2)
+legend("top",
+       legend = c("Obs.", "True states", "Smooth. states"),
+       pch = c(3, 19, NA),
+       col = c("blue", "red", "darkgoldenrod1"),
+       lwd = c(1, 1, 2), lty = c(3, 1, 1),
+       horiz=TRUE, bty="n", cex=0.9)
+```
 
 ## Gentoo movement data
 
-We will analyze a dataset containing movement tracks of three gentoo penguins tagged with Argos tags. The dataset belongs to Dr. Marie Auger-Méthé (University of British Columbia) and Dr. Glenn Crossin (Dalhousie University). They provided the data only for this tutorial, please do not use for other purposes without their consent. Contact: auger-methe@stat.ubc.ca.
+We will analyze a dataset containing movement tracks of three gentoo penguins tagged with Argos tags. The dataset belongs to Dr. Marie Auger-Méthé (University of British Columbia) and Dr. Glenn Crossin (Dalhousie University). They provided the data only for this tutorial, please do not use for other purposes without their consent. Contact: auger-methe\@stat.ubc.ca.
 
 This is the same data as the data we explored on the first day. See the first day tutorial for more information on the time intervals.
 
-Let's load the data.
+Let's load the data. Here, I'm assuming you have the Madeira-Workshop as working directory.
 
 ```{r load_gentoo, attr.source = ".numberLines"}
 gentoo_tracks <- read.csv(
@@ -64,12 +324,7 @@ gentoo_tracks <- read.csv(
 head(gentoo_tracks)
 ```
 
-The columns/variables are:
-- `ID`: Individual identifier
-- `datetime`: time of location
-- `Longitude`: longitude
-- `Latitude`: latitude
-- `Qual`: Argos location quality, one of 0, 1, 2, 3, A, B
+The columns/variables are: - `ID`: Individual identifier - `datetime`: time of location - `Longitude`: longitude - `Latitude`: latitude - `Qual`: Argos location quality, one of 0, 1, 2, 3, A, B
 
 There is often duplicates and records (rows) with missing data. We want to remove any row that is missing latitude or longitude or location quality and duplicates.
 
@@ -100,8 +355,9 @@ ggplot() +
 
 Here we are going to fit a state-space model similar to the one used in `aniMotum`. We are going to follow the general set up of the supplementary material associated with the Auger-Méthé et al. 2021 paper. However, here we are going to use `RTMB` rather than `TMB`.
 
-
-
 # Fitting a movement state-space model with `RTMB`.
 
 
+# Literature cited
+
+Auger-Méthé, M., K. Newman, D. Cole, F. Empacher, R. Gryba, A. A. King, V. Leos-Barajas, J. Mills Flemming, A. Nielsen, G. Petris, and L. Thomas. 2021. A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470. 10.1002/ecm.1470 
