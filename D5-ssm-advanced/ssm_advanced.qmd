@@ -404,11 +404,11 @@ allDays <- as.POSIXlt(paste(allDays, "17:00"), tz="UTC")
 # +1 because the it's the proportion of time between t-1 and t, we link with t.
 dataPbA$idx <- findInterval(dataPbA$Time,allDays) + 1
 # Checking how far from the z_t y is
-# dataPbA$ji <- as.numeric(24-difftime(allDays[dataPbA$idx],
-#                                  dataPbA$Time, units="hours"))/24
-
-dataPbA$ji <- as.numeric(difftime(allDays[dataPbA$idx],
+dataPbA$ji <- as.numeric(24-difftime(allDays[dataPbA$idx],
                                  dataPbA$Time, units="hours"))/24
+
+# dataPbA$ji <- as.numeric(difftime(allDays[dataPbA$idx],
+#                                  dataPbA$Time, units="hours"))/24
 ```
 
 It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package `bsam` (Jonsen et al. 2005). We have done a few changes to the values used in `bsam`. In particular, the skewness of the t-distribution is undefined when the degree of freedom is $\leq 3$. We have thus set any degree of freedom values smaller or equal to 3 to 3.00001.
@@ -488,7 +488,7 @@ dcrw <- function(parms){
       ji[i]*z[idx[i],])
     
     nll <- nll - sum(
-      log(1/(psiLon*ac[i,c(1,3)])) +
+      log(1/(c(psiLon, psiLat)*ac[i,c(1,3)])) +
       dt(tmp/(c(psiLon, psiLat)*ac[i,c(1,3)]),
          df = ac[i,c(2,4)],
          log = TRUE))
@@ -611,18 +611,20 @@ Now we can use the function `oneStepPredict` to calculate the one-step-ahead res
 Warning: this will take a few minutes to run.
 
 ```{r pbTmbResidy, cache=TRUE}
-pbRes <- oneStepPredict(mPbTmb, observation.name = "y", 
+pbRes <- RTMB::oneStepPredict(mPbTmb, 
+                              observation.name = "y", 
                         data.term.indicator = "keep", 
-                        discrete=FALSE,
-                        subset = pbKeepInd, trace=FALSE)
+                        discrete=FALSE, trace=FALSE)
+head(pbRes, 30)
+tail(pbRes, 30)
 ```
 
 We will separate the residuals for the longitude and latitude. The residuals will be ordered in the same way as `pbKeepInd`, and the first two residuals are not well defined for this model.
 
 ```{r pbTmbosasep, tidy=FALSE, cache=TRUE}
-pbResLon <- pbRes[seq(3, nrow(pbRes), by=2),
+pbResLon <- pbRes[seq(3, nrow(pbRes)/2),
                   "residual"]
-pbResLat <- pbRes[seq(4, nrow(pbRes), by=2),
+pbResLat <- pbRes[seq(nrow(pbRes)/2 + 3, nrow(pbRes)),
                   "residual"]
 ```
 
