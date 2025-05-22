@@ -358,6 +358,313 @@ Here we are going to fit a state-space model similar to the one used in `aniMotu
 # Fitting a movement state-space model with `RTMB`.
 
 
+# State-space model from Argos movement data: a polar bear example
+
+Using the data set available through Dryad Auger-Méthé and Derocher (2021) doi:10.5061/dryad.4qrfj6q96, we will explore a classic state-space model for Argos movement data, which is highly error prone. 
+
+Let us load the Argos data.
+
+```{r polar.bear.data}
+# Read the data
+dataPbA <- read.csv("Data/PB_Argos.csv")
+# Look at what it contains
+head(dataPbA)
+```
+
+We can see that we have a column with the date and time, one with the Argos quality class, one with the latitude and one with the longitude.
+
+Let us plot the data.
+
+```{r polar.bear.plot, tidy=FALSE}
+plot(dataPbA[,c("Lon", "Lat")], 
+     pch=3, cex=0.7, col = "blue", ty="o", lty=3, las=1)
+```
+
+There are clear outliers, which are likely the results of observation error rather than a bear moving at record speed.
+
+In Appendix S1 of Auger-Méthé et al. 2021, you can see how this movement compares to the GPS tracks.
+
+Here we will use the Argos data to estimate states at regular time intervals. We will estimate states once a day at 17:00. The following code chunk is just data manipulation to create the $i$ index and the time proportion $j_i$ so that we relate the time of the observed Argos locations to these fix time intervals.
+
+```{r time.interval, tidy=FALSE}
+# Transform DateTime in R date.time class
+dataPbA$Time <- as.POSIXlt(dataPbA$DateTime,
+                       format="%Y.%m.%d %H:%M:%S", tz="UTC")
+dataPbA$Date <- as.Date(dataPbA$Time)
+
+# Create a regular time series that will
+# represent the time at which we will estimate the states (z)
+# Note that because our last Argos location is after 17:00,
+# we end time series one day after
+allDays <- seq(dataPbA$Date[1],
+               dataPbA$Date[length(dataPbA$Time)] + 1, 1)
+allDays <- as.POSIXlt(paste(allDays, "17:00"), tz="UTC")
+
+# Find in between which z (allDays) observation y fall
+# +1 because the it's the proportion of time between t-1 and t, we link with t.
+dataPbA$idx <- findInterval(dataPbA$Time,allDays) + 1
+# Checking how far from the z_t y is
+# dataPbA$ji <- as.numeric(24-difftime(allDays[dataPbA$idx],
+#                                  dataPbA$Time, units="hours"))/24
+
+dataPbA$ji <- as.numeric(difftime(allDays[dataPbA$idx],
+                                 dataPbA$Time, units="hours"))/24
+```
+
+It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package `bsam` (Jonsen et al. 2005). We have done a few changes to the values used in `bsam`. In particular, the skewness of the t-distribution is undefined when the degree of freedom is $\leq 3$. We have thus set any degree of freedom values smaller or equal to 3 to 3.00001.
+
+```{r Argos.error, tidy=FALSE}
+ArgosC <- matrix(nrow=6, ncol=4)
+colnames(ArgosC) <- c("TLon","NuLon","TLat","NuLat")
+ArgosC[,"TLon"] <- c(0.037842190, 0.004565261, 0.019461776,
+                     0.008117727, 0.002807138, 0.002608584)
+ArgosC[,"TLat"] <- c(0.027369282, 0.004594551, 0.014462340,
+                     0.004142703, 0.002344425, 0.001098409)
+ArgosC[,"NuLon"] <- c(3.00001, 3.00001, 3.00001,
+                      3.00001, 3.00001, 3.070609)
+ArgosC[,"NuLat"] <- c(3.00001, 3.00001, 3.00001,
+                      3.896554, 6.314726, 3.00001)
+rownames(ArgosC) <- c("B", "A", "0",
+                      "1", "2", "3")
+```
+
+Now we create new columns in the data set that indicate the standard deviation and the degrees of freedom to use with each location.
+
+```{r polar.bear.Argos.Cat}
+dataPbA$ac <- ArgosC[as.character(dataPbA$QualClass),]
+```
+
+## Fitting the model and checking model fit
+
+### Create the C++ code defining the negative log-likelihood
+
+Again, the first thing we need to do to be able to fit the model in `TMB` is to create a file that will contain the C++ code to evaluate the negative log-likelihood value of the model. We will name the file **dcrw.cpp**.
+
+```{r dcrw_nll, tidy=FALSE}
+dcrw <- function(parms){
+  # Make items within dataPbTmb and parms easily available
+  getAll(dataPbTmb, parms, warn=FALSE)
+  # Tell TMB y is the response variable
+  y <- OBS(y)
+  
+  # Transformation of the input parameters to model format
+  # These transformations are made to insured that
+  # the parameters have sensical values.
+  # They do not change the model, 
+  # they are only a computational trick.
+  gamma <- 1.0/(1.0+exp(-logitGamma)) # b/c we want 0 < gamma < 1
+  sdLon <- exp(logSdLon) # b/c we want sd > 0
+  sdLat <- exp(logSdLat) # b/c we want sd > 0
+  psiLon <- exp(logPsiLon) # b/c we want psi > 0
+  psiLat <- exp(logPsiLat) # b/c we want psi > 0
+  
+  # Initializing the model
+  # For the 2nd time step, we assume that we have a simple random walk:
+  # z_1 = z_0 + eta
+  # We are assuming independence between coordinates
+  # Thus using two univariate normals
+  # Start with lon, lat
+  nll <- sum(dnorm(z[2,], mean = z[1,], sd = c(sdLon, sdLat), log=TRUE))
+  
+  # nll contribution of the process equation after the 2nd time step
+  for(i in 3:nrow(z)){
+    nll <- nll - sum(
+      dnorm(z[i,], 
+            mean = z[i-1,] + gamma*(z[i-1,] - z[i-2,]), 
+            sd = c(sdLon, sdLat), 
+            log = TRUE))
+  }
+  
+  # nll contribution of the observation equation
+  # The loop here is just the size of the observation vector.
+  # We use the time index found in idx to relate
+  # the appropriate state to the observation.
+  for(i in 1:nrow(y)){
+    # We are using the non-standardised t distribution,
+    # that is why we are correcting the pdf.
+    # Interpolate the value at time of observation
+    tmp <- y[i,] -
+      ((1-ji[i])*z[idx[i]-1,] +
+      ji[i]*z[idx[i],])
+    
+    nll <- nll - sum(
+      log(1/(psiLon*ac[i,c(1,3)])) +
+      dt(tmp/(c(psiLon, psiLat)*ac[i,c(1,3)]),
+         df = ac[i,c(2,4)],
+         log = TRUE))
+  }
+    
+  # Report the parameters and their standard errors in their model format
+  ADREPORT(gamma)
+  ADREPORT(sdLon)
+  ADREPORT(sdLat)
+  ADREPORT(psiLon)
+  ADREPORT(psiLat)
+  
+  return(nll)
+}
+
+```
+
+
+
+### Prepare data and set strating values for parameters
+
+Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by C++. Here we need: 1) the matrix `y`, which contains the longitude and latitude of the locations; 2) the vector `idx`, which contains the index that relates the observation at time $i$ to the appropriate state time $t$; 3) the vector `ji`, which contains when the observation falls between $t-1$ and $t$; and 4) the matrix `ac`, which contains all of the error information for the given location. As a note, we are removing 1 from the index value `idx` because the index of C++ starts a 0, not 1.
+
+```{r polar.bear.prep, tidy=FALSE}
+dataPbTmb <- list(y = cbind(dataPbA$Lon, dataPbA$Lat),
+               idx=dataPbA$idx, ji=dataPbA$ji, ac=dataPbA$ac)
+```
+
+We then need to create a list with the starting values for the parameters, including the states. To help the optimization, we will set the initial value of the states to be the values of the observed Argos location. This will just start the optimization at the good relative magnitude. We could have alternatively, scaled the model so to have transformed longitude and latitude values that are centered at 0.
+
+```{r polar.bear.initial.val, tidy=FALSE}
+# Setting the initial values for the state.
+# We use the 1st obs. location to start the optimization
+# at a relatively good place
+zinitPbTmb <- matrix(as.numeric(dataPbA[1,c("Lon","Lat")]), 
+                     max(dataPbA$idx), 2, byrow=TRUE)
+# Creating a list of initial values for the parameters
+parPbTmb <- list(logitGamma=0,
+               logSdLon=0, logSdLat=0, logPsiLon=0, logPsiLat=0,
+               z=zinitPbTmb)
+```
+
+### Fitting the state-space model to data
+
+We have now all of the pieces needed to create the object with `MakeADFun`, which will allow us to minimize the negative log likelihood. Note that for more complex model, it sometimes help to allow for more iterations in the inner maximization. This can slow down the process, but here if we use the default maximum number of inner iterations, we will get the error. Thus, we increase the number of inner iterations to 5000 using `inner.control`.
+
+```{r polar.bear.MakeADFun}
+mPbTmb <- MakeADFun(dcrw, parameters = parPbTmb, 
+                    random = "z",
+                    inner.control = list(maxit=5000),
+                    silent = TRUE)
+```
+
+Using the created object, we can find the MLE with `nlminb`.
+
+```{r polar.bear.nlminb, cache=TRUE}
+fPbTmb <- nlminb(mPbTmb$par, mPbTmb$fn, mPbTmb$gr)
+fPbTmb$message
+```
+
+Looks like it converged, so let us now look at the estimated parameters using `sdreport`.
+
+```{r pbTMBpar, cache=TRUE}
+parestPbTmb <- summary(sdreport(mPbTmb))
+parestPbTmb[c("gamma", "sdLon", "sdLat", "psiLon", "psiLat"),]
+```
+
+So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., $\gamma =$ \Sexpr{round(parestPbTmb["gamma",1],3)}.
+Interestingly, the process variation is quite different in the latitude and longitude direction.
+This could be due to the fact that one degree of latitude and one degree of longitude are not necessarily covering equivalent distance.
+We see also that the correction factors for the longitude and latitude are quite different from one another and might point to the advantage of estimating one for each coordinate.
+
+Now let us look at the state estimates. To extract the state value itself, we use `$env$parList()`. To extract the standard error, we use the matrix returned by `summary(sdreport())` above.
+
+```{r polar.bear.states}
+# Get the point value
+zsPbTmb <- mPbTmb$env$parList()$z
+# Get the standard errors
+zsvPbTmb <- parestPbTmb[rownames(parestPbTmb)%in%"z",]
+zsvPbTmb <- cbind(zsvPbTmb[1:(nrow(zsvPbTmb)/2),2], 
+                  zsvPbTmb[(1+nrow(zsvPbTmb)/2):nrow(zsvPbTmb),2])
+```
+
+Let's plot the results.
+
+```{r polar.bear.plot.states, cache=TRUE}
+plot(zsPbTmb, 
+     pch=19, cex=0.7, col = "red", ty="o", las=1,
+     xlab="Longitude", ylab="Latitude")
+points(dataPbA[,c("Lon", "Lat")], 
+       pch=3, cex=0.7, col = "blue", ty="o", lty=3)
+legend("top",
+       legend = c("Sim. Obs.", "Estimated latent states"),
+       pch = c(3, 19),
+       col = c("blue", "red"),
+       lty = c(3, 1),
+       horiz=TRUE, bty="n", cex=0.9)
+```
+
+In Appendix S1 of Auger-Méthé et al. 2021, we compare the estimated locations with this model to the GPS data, and see that the are quite similar.
+
+### Checking the model fit
+
+We can now look at the one-step-ahead residuals. Because the indicator variable used to keep track of the observations to remove during the calculation of one-step-ahead residuals is an array in the C++ code, it is important to make sure the index used in the `subset` argument correctly describes the order in which the observations are added. When a matrix is transformed into an array, the first column is collated to the second column by default. As such, we want to create an index that goes in sequence from longitude to latitude one time step at a time.
+
+```{r pbTmbResidIndex, tidy=FALSE, cache=TRUE}
+# Argos data as a matrix
+head(dataPbTmb$y)
+# Argos data when transformed as a array
+# Notice that it's the longitude first
+head(array(dataPbTmb$y))
+# Create the index vector 
+# that describes the order of observation to add
+pbKeepInd <- as.vector(t(matrix(1:length(dataPbTmb$y), ncol=2)))
+head(pbKeepInd)
+```
+
+Now we can use the function `oneStepPredict` to calculate the one-step-ahead residuals. 
+
+Warning: this will take a few minutes to run.
+
+```{r pbTmbResidy, cache=TRUE}
+pbRes <- oneStepPredict(mPbTmb, observation.name = "y", 
+                        data.term.indicator = "keep", 
+                        discrete=FALSE,
+                        subset = pbKeepInd, trace=FALSE)
+```
+
+We will separate the residuals for the longitude and latitude. The residuals will be ordered in the same way as `pbKeepInd`, and the first two residuals are not well defined for this model.
+
+```{r pbTmbosasep, tidy=FALSE, cache=TRUE}
+pbResLon <- pbRes[seq(3, nrow(pbRes), by=2),
+                  "residual"]
+pbResLat <- pbRes[seq(4, nrow(pbRes), by=2),
+                  "residual"]
+```
+
+Now let us visually assess the residuals.
+
+```{r pbTmbResidPlot, tidy=FALSE, cache=TRUE}
+layout(matrix(1:8, nrow=2))
+# General look at residuals
+plot(pbResLon, pch=19, cex=0.5,
+     ylab="Residuals - Lon", las=1)
+abline(h=0, col="hotpink")
+plot(pbResLat, pch=19, cex=0.5,
+     ylab="Residuals - Lat", las=1)
+abline(h=0, col="hotpink")
+
+# Check autocorrelation
+acf(pbResLon, main="", ylab="ACF - Lon")
+acf(pbResLat, main="", ylab="ACF - Lat")
+
+# Check normality
+qqnorm(pbResLon)
+qqline(pbResLon)
+qqnorm(pbResLat)
+qqline(pbResLat)
+hist(pbResLon, breaks=40, freq = FALSE, 
+     col="darkgrey", las=1,
+     main="", ylab="Prob. - Lon")
+curve(dnorm, -5, 5, add=TRUE, 
+      lwd=2, col="hotpink")
+hist(pbResLat, breaks=40, freq = FALSE, 
+     col="darkgrey", las=1,
+     main="", ylab="Prob. - Lat")
+curve(dnorm, -5, 5, add=TRUE, 
+      lwd=2, col="hotpink")
+```
+
+Overall the residuals look pretty good. There is no obvious patterns in the residuals through time. There is no autocorrelation. The only sign of a slight problem is that their appears to be some deviation from normality. We can see this from the qqplots, and the histograms. This could be due to a mismatch in the values assigned to the different quality categories, and in a real analysis it would be worth looking into this issue further.
+
 # Literature cited
 
-Auger-Méthé, M., K. Newman, D. Cole, F. Empacher, R. Gryba, A. A. King, V. Leos-Barajas, J. Mills Flemming, A. Nielsen, G. Petris, and L. Thomas. 2021. A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470. 10.1002/ecm.1470 
+Auger-Méthé M, Derocher AE (2021) Argos and GPS data for a polar bear track, Dryad, Dataset, https://doi.org/10.5061/dryad.4qrfj6q96
+
+Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470.  https://doi.org/10.1002/ecm.1470
+
+Jonsen ID, Mills Flemming J, Myers RA (2005) Robust state-space modeling of animal movement data. Ecology 86:2874-2880
