@@ -133,16 +133,13 @@ legend("top",
 
 With real data, we usually only have the observations, $y_t$, and do not know the true states, $z_t$. However, simulated data allow us to see the discrepancies between the observed values and the values for the process they represent.
 
-## Fitting the model using TMB
+## Fitting the model using `RTMB`
 
-In TMB you need to create a C++ file that computes the value of the negative log likelihood for your data and for a given set of parameter values. Then, you compile the C++ code using `TMB` and use that function in one of R's optimizers to find the minimum negative log likelihood. The beauty of `TMB` is that it uses the Laplace approximation to integrate over the states and computes the gradient efficiently, which speeds up the optimizing process.
+In `RTMB` you need to create a function that computes the value of the negative log likelihood value for a given set of parameter values. Then, you use that function in one of R's optimizers to find the minimum negative log likelihood. The beauty of `TMB` is that it uses the Laplace approximation to integrate over the states and computes the gradient efficiently, which speeds up the optimizing process.
 
+### Writing the negative log-likelihood function
 
-### Writing the negative log-likelihood function in C++
-
-Now, let us create the negative log-likelihood function that we will minimize (equivalent of maximizing the likelihood). We write this function in a special TMB C++ language. The code for the function needs to be saved in a text file. We usually give it the extension .cpp. You can do this directly in R Studio. You write the code just as you would write a separate R script, but you save it as a C++ file by giving it the .cpp extension.
-
-We name the file **toy2p.cpp** and it will contain the following code. Note that in C++, comments are preceded by // or contained within /* */. Also, as explained below, here the code is a little bit more complex than strictly necessary. We have included code that allow us to compute the one-step-ahead residuals and simulate from the model. While these features are not always necessary, they are key to model checking and thus we believe they should be part of all model fitting workflow.
+Now, let us create the negative log-likelihood function that we will minimize (equivalent of maximizing the likelihood).
 
 ```{r toy2p, attr.source = ".numberLines", tidy=FALSE}
 # Define main function
