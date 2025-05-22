@@ -21,7 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Credits
 
-This tutorial uses materials that was created for the Appendix of the paper Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470.  https://doi.org/10.1002/ecm.1470 Some of the material is taken verbatim. Please cite the paper rather than this code.
+This tutorial uses materials that was created for the Appendix of the paper Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470.  https://doi.org/10.1002/ecm.1470 Some of the material is taken verbatim. Please refer and cite the paper rather than this code if appropriate.
 
 # Tutorial goals
 
@@ -30,7 +30,7 @@ The goal of this tutorial is to start exploring how one can write your one state
 The primary learning objectives are to:
 
 1.  Understand how to write a state-space model using `RTMB` through a simulation example.
-2.  Write a simple state-spacel model for Argos movement data in `RTMB`.
+2.  Write a simple state-space model for Argos movement data in `RTMB`.
 
 # General setup
 
@@ -41,10 +41,7 @@ library(tidyverse)  # data management
 library(ggspatial)  # plot the data
 library(sf)         # spatial data processing
 library(here)       # To help with sourcing
-# library(terra)
-# library(tidyterra)
 library(RTMB)
-library(rstan)
 ```
 
 # Introducing the method with a toy state-space model
