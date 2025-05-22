@@ -69,11 +69,11 @@ This model has two parameters: $\sigma_o, \sigma_p$.
 
 ## Simulated data
 
-To first explore how TMB works, we will use data simulated from this model.
+To first explore how `RTMB` works, we will use data simulated from this model.
 
 First, let us simulate the process for a time series of length 200 ($T=200$), with an additional time step for the state at $t=0$. To be consistent with the model description, we set to $z_0 = 0$. We choose the standard deviation of the process variation, $\sigma_p$, to be 0.1.
 
-```{r process.sim, tidy=FALSE}
+```{r process.sim, attr.source = ".numberLines", tidy=FALSE}
 # Create a vector that will keep track of the states
 # It's of length T + 1 (+1 for t=0)
 # T is not a good name in R, because of T/F, so we use TT
@@ -94,7 +94,7 @@ for(i in 1:TT){
 
 Let us plot the time series we have created.
 
-```{r process.sim.fig}
+```{r process.sim.fig, attr.source = ".numberLines"}
 plot(0:TT, z,
      pch = 19, cex = 0.7, col="red", ty = "o", 
      xlab = "t", ylab = expression(z[t]), las=1)
@@ -102,7 +102,7 @@ plot(0:TT, z,
 
 Second, let us simulate the observations. We set the standard deviation of the observation error $\sigma_o$ to 0.1.
 
-```{r obs.sim, tidy=FALSE}
+```{r obs.sim, attr.source = ".numberLines", tidy=FALSE}
 # Create a vector that will keep track of the observations
 # It's of length T
 y <- numeric(TT)
@@ -115,7 +115,7 @@ y <- z[2:(TT+1)] + rnorm(TT, 0, sdo)
 
 Let us plot both the observations and the states. From now on, we are adding extra space on the y-axis to leave space for the legend. Note that the space we assigned may not work for all figure sizes.
 
-```{r obs.sim.fig, tidy=FALSE}
+```{r obs.sim.fig, attr.source = ".numberLines", tidy=FALSE}
 plot(1:TT, y,
      pch=3, cex = 0.8, col="blue", ty="o", lty = 3,
      xlab = "t", ylab = expression(z[t]),
@@ -144,7 +144,7 @@ Now, let us create the negative log-likelihood function that we will minimize (e
 
 We name the file **toy2p.cpp** and it will contain the following code. Note that in C++, comments are preceded by // or contained within /* */. Also, as explained below, here the code is a little bit more complex than strictly necessary. We have included code that allow us to compute the one-step-ahead residuals and simulate from the model. While these features are not always necessary, they are key to model checking and thus we believe they should be part of all model fitting workflow.
 
-```{r toy2p, tidy=FALSE}
+```{r toy2p, attr.source = ".numberLines", tidy=FALSE}
 # Define main function
 toy2p <- function(parms, data){
   getAll(dataTmb, parms, warn=FALSE)
@@ -202,20 +202,20 @@ toy2p <- function(parms, data){
 
 First, we need to prepare the data. This is going to be a list with all the items found in the .cpp files that are of the type `DATA` (e.g., `DATA_VECTOR`). Here, we only have `y` which is the time series of observed values.
 
-```{r prepY}
+```{r prepY, attr.source = ".numberLines"}
 dataTmb <- data.frame(y = y)
 ```
 
 Second, we need a list with the parameters. Again the names need to match those in the .cpp file. These are the starting values for the parameters. Note that this includes both the parameters and the states.
 
-```{r parPrep, tidy=FALSE}
+```{r parPrep, attr.source = ".numberLines", tidy=FALSE}
 par2pTmb <- list(logSdP = 0, logSdO = 0,
              z=rep(0, length(dataTmb$y)+1))
 ```
 
 By default all values of `par2pTmb` will be estimated, but we assume that we know the value of the state at time 0, $z_0 = 0$. To provide this information, we can create a named list that we will input for the argument `map` of the function `MakeADFun` below. The elements of `map` should have the same name and size as those in `par2pTmb`, but we only need to specify the elements that we want to manipulate, here `par2pTmb$z`. To fix a value, we set that value to `NA`. The values that are estimated should have a different entry and all values should be factors.
 
-```{r tmbMapPrep}
+```{r tmbMapPrep, attr.source = ".numberLines"}
 mapTmb <- list(z=as.factor(c(NA,1:length(dataTmb$y))))
 ```
 
@@ -224,7 +224,7 @@ log likelihood and the gradients.
 
 To identify our random effects, namely the states, $z_t$, we set the argument `random` to equal the name of the parameters that are random effects. The argument `DLL` identify the compiled C++ function to be linked.
 
-```{r MakeADFun, tidy=FALSE}
+```{r MakeADFun, attr.source = ".numberLines", tidy=FALSE}
 m2pTmb <- RTMB::MakeADFun(toy2p, 
                     parameters = par2pTmb, 
                     map = mapTmb, 
@@ -237,7 +237,7 @@ m2pTmb <- RTMB::MakeADFun(toy2p,
 
 We fit the model using `nlminb`, which is a base R optimizer, but we input the object returned by `MakeADFun`.
 
-```{r tmbOpt, tidy=FALSE, cache=TRUE}
+```{r tmbOpt, attr.source = ".numberLines", tidy=FALSE, cache=TRUE}
 f2pTmb <- nlminb(start = m2pTmb$par, # Initial values for the parameters
                  objective = m2pTmb$fn, # Function to be minimized
                  gradient = m2pTmb$gr) # Gradient of the objective
@@ -245,7 +245,7 @@ f2pTmb <- nlminb(start = m2pTmb$par, # Initial values for the parameters
 
 It is important to check whether the model converged.
 
-```{r}
+```{r, attr.source = ".numberLines"}
 f2pTmb$message
 ```
 
@@ -255,7 +255,7 @@ A message stating `"both X-convergence and relative convergence (5)"` would also
 
 To look at the parameter estimates, you can use the function `sdreport` and object object created by `MakeADFun`.
 
-```{r tmbEst, tidy=FALSE}
+```{r tmbEst, attr.source = ".numberLines", tidy=FALSE}
 sdr2pTmb <- summary(sdreport(m2pTmb))
 # This will have the parameters and states
 # So we can just print the parameters
@@ -267,7 +267,7 @@ We can see that the estimates for both the process variation and the observation
 
 We can get the smoothed state values with the `sdreport` function as above and this will give you the SEs for these states. If you are only interested in the state values (not theis SEs), you can also extract them directly from the model object.
 
-```{r toy.states.est, tidy=FALSE, cache=TRUE}
+```{r toy.states.est, attr.source = ".numberLines", tidy=FALSE, cache=TRUE}
 # To get the point estimate and the SE of the states
 zsSe2pTmb <- sdr2pTmb[row.names(sdr2pTmb)=="z",]
 head(zsSe2pTmb)
@@ -280,7 +280,7 @@ Note that in this case, because we fixed the value of the state at time $t=0$, t
 
 We can use the SEs to calculate the 95\% confidence intervals.
 
-```{r tmbCI, tidy=FALSE}
+```{r tmbCI, attr.source = ".numberLines", tidy=FALSE}
 zsCIl2pTmb <- zsSe2pTmb[,1] + 
   qnorm(0.025, sd = zsSe2pTmb[,2])
 zsCIu2pTmb <- zsSe2pTmb[,1] + 
@@ -289,7 +289,7 @@ zsCIu2pTmb <- zsSe2pTmb[,1] +
 
 We can now overlay the state estimates along with their confidence intervals on the plot of the simulated data.
 
-```{R tmbRp, tidy=FALSE}
+```{R tmbRp, attr.source = ".numberLines", tidy=FALSE}
 plot(1:TT, y,
      pch=3, cex=0.8, col="blue", ty="o", lty = 3,
      xlab = "t", ylab = expression(z[t]),
@@ -318,7 +318,7 @@ Using the data set available through Dryad Auger-Méthé and Derocher (2021) doi
 
 Let us load the Argos data.
 
-```{r polar.bear.data}
+```{r polar.bear.data, attr.source = ".numberLines"}
 # Read the data
 dataPbA <- read.csv("Data/PB_Argos.csv")
 # Look at what it contains
@@ -329,7 +329,7 @@ We can see that we have a column with the date and time, one with the Argos qual
 
 Let us plot the data.
 
-```{r polar.bear.plot, tidy=FALSE}
+```{r polar.bear.plot, attr.source = ".numberLines", tidy=FALSE}
 plot(dataPbA[,c("Lon", "Lat")], 
      pch=3, cex=0.7, col = "blue", ty="o", lty=3, las=1)
 ```
@@ -340,7 +340,7 @@ In Appendix S1 of Auger-Méthé et al. 2021, you can see how this movement compa
 
 Here we will use the Argos data to estimate states at regular time intervals. We will estimate states once a day at 17:00. The following code chunk is just data manipulation to create the $i$ index and the time proportion $j_i$ so that we relate the time of the observed Argos locations to these fix time intervals.
 
-```{r time.interval, tidy=FALSE}
+```{r time.interval, attr.source = ".numberLines", tidy=FALSE}
 # Transform DateTime in R date.time class
 dataPbA$Time <- as.POSIXlt(dataPbA$DateTime,
                        format="%Y.%m.%d %H:%M:%S", tz="UTC")
@@ -367,7 +367,7 @@ dataPbA$ji <- as.numeric(24-difftime(allDays[dataPbA$idx],
 
 It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package `bsam` (Jonsen et al. 2005). We have done a few changes to the values used in `bsam`. In particular, the skewness of the t-distribution is undefined when the degree of freedom is $\leq 3$. We have thus set any degree of freedom values smaller or equal to 3 to 3.00001.
 
-```{r Argos.error, tidy=FALSE}
+```{r Argos.error, attr.source = ".numberLines", tidy=FALSE}
 ArgosC <- matrix(nrow=6, ncol=4)
 colnames(ArgosC) <- c("TLon","NuLon","TLat","NuLat")
 ArgosC[,"TLon"] <- c(0.037842190, 0.004565261, 0.019461776,
@@ -384,7 +384,7 @@ rownames(ArgosC) <- c("B", "A", "0",
 
 Now we create new columns in the data set that indicate the standard deviation and the degrees of freedom to use with each location.
 
-```{r polar.bear.Argos.Cat}
+```{r polar.bear.Argos.Cat, attr.source = ".numberLines"}
 dataPbA$ac <- ArgosC[as.character(dataPbA$QualClass),]
 ```
 
@@ -394,7 +394,7 @@ dataPbA$ac <- ArgosC[as.character(dataPbA$QualClass),]
 
 Again, the first thing we need to do to be able to fit the model in `TMB` is to create a file that will contain the C++ code to evaluate the negative log-likelihood value of the model. We will name the file **dcrw.cpp**.
 
-```{r dcrw_nll, tidy=FALSE}
+```{r dcrw_nll, attr.source = ".numberLines", tidy=FALSE}
 dcrw <- function(parms){
   # Make items within dataPbTmb and parms easily available
   getAll(dataPbTmb, parms, warn=FALSE)
@@ -466,14 +466,14 @@ dcrw <- function(parms){
 
 Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by C++. Here we need: 1) the matrix `y`, which contains the longitude and latitude of the locations; 2) the vector `idx`, which contains the index that relates the observation at time $i$ to the appropriate state time $t$; 3) the vector `ji`, which contains when the observation falls between $t-1$ and $t$; and 4) the matrix `ac`, which contains all of the error information for the given location. As a note, we are removing 1 from the index value `idx` because the index of C++ starts a 0, not 1.
 
-```{r polar.bear.prep, tidy=FALSE}
+```{r polar.bear.prep, attr.source = ".numberLines", tidy=FALSE}
 dataPbTmb <- list(y = cbind(dataPbA$Lon, dataPbA$Lat),
                idx=dataPbA$idx, ji=dataPbA$ji, ac=dataPbA$ac)
 ```
 
 We then need to create a list with the starting values for the parameters, including the states. To help the optimization, we will set the initial value of the states to be the values of the observed Argos location. This will just start the optimization at the good relative magnitude. We could have alternatively, scaled the model so to have transformed longitude and latitude values that are centered at 0.
 
-```{r polar.bear.initial.val, tidy=FALSE}
+```{r polar.bear.initial.val, attr.source = ".numberLines", tidy=FALSE}
 # Setting the initial values for the state.
 # We use the 1st obs. location to start the optimization
 # at a relatively good place
@@ -489,7 +489,7 @@ parPbTmb <- list(logitGamma=0,
 
 We have now all of the pieces needed to create the object with `MakeADFun`, which will allow us to minimize the negative log likelihood. Note that for more complex model, it sometimes help to allow for more iterations in the inner maximization. This can slow down the process, but here if we use the default maximum number of inner iterations, we will get the error. Thus, we increase the number of inner iterations to 5000 using `inner.control`.
 
-```{r polar.bear.MakeADFun}
+```{r polar.bear.MakeADFun, attr.source = ".numberLines"}
 mPbTmb <- MakeADFun(dcrw, parameters = parPbTmb, 
                     random = "z",
                     inner.control = list(maxit=5000),
@@ -498,14 +498,14 @@ mPbTmb <- MakeADFun(dcrw, parameters = parPbTmb,
 
 Using the created object, we can find the MLE with `nlminb`.
 
-```{r polar.bear.nlminb, cache=TRUE}
+```{r polar.bear.nlminb, attr.source = ".numberLines", cache=TRUE}
 fPbTmb <- nlminb(mPbTmb$par, mPbTmb$fn, mPbTmb$gr)
 fPbTmb$message
 ```
 
 Looks like it converged, so let us now look at the estimated parameters using `sdreport`.
 
-```{r pbTMBpar, cache=TRUE}
+```{r pbTMBpar, attr.source = ".numberLines", cache=TRUE}
 parestPbTmb <- summary(sdreport(mPbTmb))
 parestPbTmb[c("gamma", "sdLon", "sdLat", "psiLon", "psiLat"),]
 ```
@@ -517,7 +517,7 @@ We see also that the correction factors for the longitude and latitude are quite
 
 Now let us look at the state estimates. To extract the state value itself, we use `$env$parList()`. To extract the standard error, we use the matrix returned by `summary(sdreport())` above.
 
-```{r polar.bear.states}
+```{r polar.bear.states, attr.source = ".numberLines"}
 # Get the point value
 zsPbTmb <- mPbTmb$env$parList()$z
 # Get the standard errors
@@ -528,7 +528,7 @@ zsvPbTmb <- cbind(zsvPbTmb[1:(nrow(zsvPbTmb)/2),2],
 
 Let's plot the results.
 
-```{r polar.bear.plot.states, cache=TRUE}
+```{r polar.bear.plot.states, attr.source = ".numberLines", cache=TRUE}
 plot(zsPbTmb, 
      pch=19, cex=0.7, col = "red", ty="o", las=1,
      xlab="Longitude", ylab="Latitude")

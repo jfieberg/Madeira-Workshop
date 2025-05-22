@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Building state-space models</title>
+<title>Building state-space models with RTMB</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -108,7 +108,7 @@ window.Quarto = {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Building state-space models</h1>
+<h1 class="title">Building state-space models with RTMB</h1>
 </div>
 
 
@@ -132,13 +132,17 @@ body
 pre.numberSource code
 { counter-reset: none; }
 </style>
+<section id="credits" class="level1">
+<h1>Credits</h1>
+<p>This tutorial uses materials that was created for the Appendix of the paper Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470. https://doi.org/10.1002/ecm.1470 Some of the material is taken verbatim. Please refer and cite the paper rather than this code if appropriate.</p>
+</section>
 <section id="tutorial-goals" class="level1">
 <h1>Tutorial goals</h1>
 <p>The goal of this tutorial is to start exploring how one can write your one state-space model.</p>
 <p>The primary learning objectives are to:</p>
 <ol type="1">
-<li>Use <code>RTMB</code> to write a simple state-space model.</li>
-<li>Use <code>rstan</code> to write a simple state-space model.</li>
+<li>Understand how to write a state-space model using <code>RTMB</code> through a simulation example.</li>
+<li>Write a simple state-space model for Argos movement data in <code>RTMB</code>.</li>
 </ol>
 </section>
 <section id="general-setup" class="level1">
@@ -149,10 +153,7 @@ pre.numberSource code
 <span id="cb1-2"><a href="#cb1-2"></a><span class="fu">library</span>(ggspatial)  <span class="co"># plot the data</span></span>
 <span id="cb1-3"><a href="#cb1-3"></a><span class="fu">library</span>(sf)         <span class="co"># spatial data processing</span></span>
 <span id="cb1-4"><a href="#cb1-4"></a><span class="fu">library</span>(here)       <span class="co"># To help with sourcing</span></span>
-<span id="cb1-5"><a href="#cb1-5"></a><span class="co"># library(terra)</span></span>
-<span id="cb1-6"><a href="#cb1-6"></a><span class="co"># library(tidyterra)</span></span>
-<span id="cb1-7"><a href="#cb1-7"></a><span class="fu">library</span>(RTMB)</span>
-<span id="cb1-8"><a href="#cb1-8"></a><span class="fu">library</span>(rstan)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-5"><a href="#cb1-5"></a><span class="fu">library</span>(RTMB)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="introducing-the-method-with-a-toy-state-space-model" class="level1">
@@ -172,31 +173,31 @@ pre.numberSource code
 </section>
 <section id="simulated-data" class="level2">
 <h2 class="anchored" data-anchor-id="simulated-data">Simulated data</h2>
-<p>To first explore how TMB works, we will use data simulated from this model.</p>
+<p>To first explore how <code>RTMB</code> works, we will use data simulated from this model.</p>
 <p>First, let us simulate the process for a time series of length 200 (<span class="math inline">\(T=200\)</span>), with an additional time step for the state at <span class="math inline">\(t=0\)</span>. To be consistent with the model description, we set to <span class="math inline">\(z_0 = 0\)</span>. We choose the standard deviation of the process variation, <span class="math inline">\(\sigma_p\)</span>, to be 0.1.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a vector that will keep track of the states</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co"># It's of length T + 1 (+1 for t=0)</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># T is not a good name in R, because of T/F, so we use TT</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>TT <span class="ot">&lt;-</span> <span class="dv">200</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>z <span class="ot">&lt;-</span> <span class="fu">numeric</span>(TT <span class="sc">+</span> <span class="dv">1</span>)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Standard deviation of the process variation</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>sdp <span class="ot">&lt;-</span> <span class="fl">0.1</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Set the seed, so we can reproduce the results</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">553</span>)</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># For-loop that simulates the state through time, using i instead of t,</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>TT){</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># This is the process equation</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  z[i<span class="sc">+</span><span class="dv">1</span>] <span class="ot">&lt;-</span> z[i] <span class="sc">+</span> <span class="fu">rnorm</span>(<span class="dv">1</span>, <span class="dv">0</span>, sdp)</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Note that this index is shifted compared to equation in text,</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># because we assume the first value to be at time 0</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1"></a><span class="co"># Create a vector that will keep track of the states</span></span>
+<span id="cb2-2"><a href="#cb2-2"></a><span class="co"># It's of length T + 1 (+1 for t=0)</span></span>
+<span id="cb2-3"><a href="#cb2-3"></a><span class="co"># T is not a good name in R, because of T/F, so we use TT</span></span>
+<span id="cb2-4"><a href="#cb2-4"></a>TT <span class="ot">&lt;-</span> <span class="dv">200</span></span>
+<span id="cb2-5"><a href="#cb2-5"></a>z <span class="ot">&lt;-</span> <span class="fu">numeric</span>(TT <span class="sc">+</span> <span class="dv">1</span>)</span>
+<span id="cb2-6"><a href="#cb2-6"></a><span class="co"># Standard deviation of the process variation</span></span>
+<span id="cb2-7"><a href="#cb2-7"></a>sdp <span class="ot">&lt;-</span> <span class="fl">0.1</span></span>
+<span id="cb2-8"><a href="#cb2-8"></a><span class="co"># Set the seed, so we can reproduce the results</span></span>
+<span id="cb2-9"><a href="#cb2-9"></a><span class="fu">set.seed</span>(<span class="dv">553</span>)</span>
+<span id="cb2-10"><a href="#cb2-10"></a><span class="co"># For-loop that simulates the state through time, using i instead of t,</span></span>
+<span id="cb2-11"><a href="#cb2-11"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>TT){</span>
+<span id="cb2-12"><a href="#cb2-12"></a>  <span class="co"># This is the process equation</span></span>
+<span id="cb2-13"><a href="#cb2-13"></a>  z[i<span class="sc">+</span><span class="dv">1</span>] <span class="ot">&lt;-</span> z[i] <span class="sc">+</span> <span class="fu">rnorm</span>(<span class="dv">1</span>, <span class="dv">0</span>, sdp)</span>
+<span id="cb2-14"><a href="#cb2-14"></a>  <span class="co"># Note that this index is shifted compared to equation in text,</span></span>
+<span id="cb2-15"><a href="#cb2-15"></a>  <span class="co"># because we assume the first value to be at time 0</span></span>
+<span id="cb2-16"><a href="#cb2-16"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let us plot the time series we have created.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="dv">0</span><span class="sc">:</span>TT, z,</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.7</span>, <span class="at">col=</span><span class="st">"red"</span>, <span class="at">ty =</span> <span class="st">"o"</span>, </span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">"t"</span>, <span class="at">ylab =</span> <span class="fu">expression</span>(z[t]), <span class="at">las=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1"></a><span class="fu">plot</span>(<span class="dv">0</span><span class="sc">:</span>TT, z,</span>
+<span id="cb3-2"><a href="#cb3-2"></a>     <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.7</span>, <span class="at">col=</span><span class="st">"red"</span>, <span class="at">ty =</span> <span class="st">"o"</span>, </span>
+<span id="cb3-3"><a href="#cb3-3"></a>     <span class="at">xlab =</span> <span class="st">"t"</span>, <span class="at">ylab =</span> <span class="fu">expression</span>(z[t]), <span class="at">las=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -207,30 +208,30 @@ pre.numberSource code
 </div>
 <p>Second, let us simulate the observations. We set the standard deviation of the observation error <span class="math inline">\(\sigma_o\)</span> to 0.1.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a vector that will keep track of the observations</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># It's of length T</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> <span class="fu">numeric</span>(TT)</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Standard deviation of the observation error</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>sdo <span class="ot">&lt;-</span> <span class="fl">0.1</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co"># For t=1, ... T, add measurement error</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Remember that z[1] is t=0</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> z[<span class="dv">2</span><span class="sc">:</span>(TT<span class="sc">+</span><span class="dv">1</span>)] <span class="sc">+</span> <span class="fu">rnorm</span>(TT, <span class="dv">0</span>, sdo)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1"></a><span class="co"># Create a vector that will keep track of the observations</span></span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="co"># It's of length T</span></span>
+<span id="cb4-3"><a href="#cb4-3"></a>y <span class="ot">&lt;-</span> <span class="fu">numeric</span>(TT)</span>
+<span id="cb4-4"><a href="#cb4-4"></a><span class="co"># Standard deviation of the observation error</span></span>
+<span id="cb4-5"><a href="#cb4-5"></a>sdo <span class="ot">&lt;-</span> <span class="fl">0.1</span></span>
+<span id="cb4-6"><a href="#cb4-6"></a><span class="co"># For t=1, ... T, add measurement error</span></span>
+<span id="cb4-7"><a href="#cb4-7"></a><span class="co"># Remember that z[1] is t=0</span></span>
+<span id="cb4-8"><a href="#cb4-8"></a>y <span class="ot">&lt;-</span> z[<span class="dv">2</span><span class="sc">:</span>(TT<span class="sc">+</span><span class="dv">1</span>)] <span class="sc">+</span> <span class="fu">rnorm</span>(TT, <span class="dv">0</span>, sdo)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let us plot both the observations and the states. From now on, we are adding extra space on the y-axis to leave space for the legend. Note that the space we assigned may not work for all figure sizes.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="dv">1</span><span class="sc">:</span>TT, y,</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex =</span> <span class="fl">0.8</span>, <span class="at">col=</span><span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty =</span> <span class="dv">3</span>,</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">"t"</span>, <span class="at">ylab =</span> <span class="fu">expression</span>(z[t]),</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlim =</span> <span class="fu">c</span>(<span class="dv">0</span>,TT), <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fu">min</span>(y), <span class="fu">max</span>(y)<span class="sc">+</span><span class="fu">max</span>(y)<span class="sc">/</span><span class="dv">5</span>),</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>     <span class="at">las =</span> <span class="dv">1</span>)</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(<span class="dv">0</span><span class="sc">:</span>TT, z,</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.7</span>, <span class="at">col=</span><span class="st">"red"</span>, <span class="at">ty =</span> <span class="st">"o"</span>)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"top"</span>,</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Obs."</span>, <span class="st">"True latent states"</span>),</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>       <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">19</span>),</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"blue"</span>, <span class="st">"red"</span>),</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>       <span class="at">lty =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">1</span>),</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>       <span class="at">horiz=</span><span class="cn">TRUE</span>, <span class="at">bty=</span><span class="st">"n"</span>, <span class="at">cex=</span><span class="fl">0.9</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1"></a><span class="fu">plot</span>(<span class="dv">1</span><span class="sc">:</span>TT, y,</span>
+<span id="cb5-2"><a href="#cb5-2"></a>     <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex =</span> <span class="fl">0.8</span>, <span class="at">col=</span><span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty =</span> <span class="dv">3</span>,</span>
+<span id="cb5-3"><a href="#cb5-3"></a>     <span class="at">xlab =</span> <span class="st">"t"</span>, <span class="at">ylab =</span> <span class="fu">expression</span>(z[t]),</span>
+<span id="cb5-4"><a href="#cb5-4"></a>     <span class="at">xlim =</span> <span class="fu">c</span>(<span class="dv">0</span>,TT), <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fu">min</span>(y), <span class="fu">max</span>(y)<span class="sc">+</span><span class="fu">max</span>(y)<span class="sc">/</span><span class="dv">5</span>),</span>
+<span id="cb5-5"><a href="#cb5-5"></a>     <span class="at">las =</span> <span class="dv">1</span>)</span>
+<span id="cb5-6"><a href="#cb5-6"></a><span class="fu">points</span>(<span class="dv">0</span><span class="sc">:</span>TT, z,</span>
+<span id="cb5-7"><a href="#cb5-7"></a>       <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.7</span>, <span class="at">col=</span><span class="st">"red"</span>, <span class="at">ty =</span> <span class="st">"o"</span>)</span>
+<span id="cb5-8"><a href="#cb5-8"></a><span class="fu">legend</span>(<span class="st">"top"</span>,</span>
+<span id="cb5-9"><a href="#cb5-9"></a>       <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Obs."</span>, <span class="st">"True latent states"</span>),</span>
+<span id="cb5-10"><a href="#cb5-10"></a>       <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">19</span>),</span>
+<span id="cb5-11"><a href="#cb5-11"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"blue"</span>, <span class="st">"red"</span>),</span>
+<span id="cb5-12"><a href="#cb5-12"></a>       <span class="at">lty =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">1</span>),</span>
+<span id="cb5-13"><a href="#cb5-13"></a>       <span class="at">horiz=</span><span class="cn">TRUE</span>, <span class="at">bty=</span><span class="st">"n"</span>, <span class="at">cex=</span><span class="fl">0.9</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -249,95 +250,95 @@ pre.numberSource code
 <p>Now, let us create the negative log-likelihood function that we will minimize (equivalent of maximizing the likelihood). We write this function in a special TMB C++ language. The code for the function needs to be saved in a text file. We usually give it the extension .cpp. You can do this directly in R Studio. You write the code just as you would write a separate R script, but you save it as a C++ file by giving it the .cpp extension.</p>
 <p>We name the file <strong>toy2p.cpp</strong> and it will contain the following code. Note that in C++, comments are preceded by // or contained within /* */. Also, as explained below, here the code is a little bit more complex than strictly necessary. We have included code that allow us to compute the one-step-ahead residuals and simulate from the model. While these features are not always necessary, they are key to model checking and thus we believe they should be part of all model fitting workflow.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define main function</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>toy2p <span class="ot">&lt;-</span> <span class="cf">function</span>(parms, data){</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">getAll</span>(dataTmb, parms, <span class="at">warn=</span><span class="cn">FALSE</span>)</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Optional (enables extra RTMB features)</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Tells RTMB that it's the response</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  y <span class="ot">&lt;-</span> <span class="fu">OBS</span>(y)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Specify the parameters transformation</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Transform standard deviations</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># exp(par) is a trick to make sure that the estimated sd &gt; 0</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  sdp <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdP)</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  sdo <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdO)</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Initialize joint negative log likelihood</span></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  nll <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># of the process equation for t=1,...,T</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remember that we fixed z_0 = 0</span></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">2</span><span class="sc">:</span><span class="fu">length</span>(z)){</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(z[i], <span class="at">mean=</span>z[i<span class="dv">-1</span>], <span class="at">sd=</span>sdp, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>   </span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>  <span class="co"># of the observation equation for t=1,...,T</span></span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remember, the first element of z is at t=0,</span></span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># while the first element of y is at t=1</span></span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(y)){</span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(y[i], <span class="at">mean=</span>z[i<span class="sc">+</span><span class="dv">1</span>], <span class="at">sd=</span>sdo, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>   </span>
-<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>  <span class="co"># State the transformed parameters to report</span></span>
-<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Using ADREPORT will return the point values and the standard errors</span></span>
-<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Note that we only need to specify this for parameters</span></span>
-<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>  <span class="co"># we transformed, see section D above</span></span>
-<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>  <span class="co"># The other parameters, including the random effects (states),</span></span>
-<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># will be returned automatically</span></span>
-<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ADREPORT</span>(sdp)</span>
-<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ADREPORT</span>(sdo)</span>
-<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a>   <span class="co">#State that we want the negative log-likelihood to be returned</span></span>
-<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>  <span class="co">#This is what the optimizer in R will minimize</span></span>
-<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(nll)</span>
-<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1"></a><span class="co"># Define main function</span></span>
+<span id="cb6-2"><a href="#cb6-2"></a>toy2p <span class="ot">&lt;-</span> <span class="cf">function</span>(parms, data){</span>
+<span id="cb6-3"><a href="#cb6-3"></a>  <span class="fu">getAll</span>(dataTmb, parms, <span class="at">warn=</span><span class="cn">FALSE</span>)</span>
+<span id="cb6-4"><a href="#cb6-4"></a>  <span class="do">## Optional (enables extra RTMB features)</span></span>
+<span id="cb6-5"><a href="#cb6-5"></a>  <span class="co"># Tells RTMB that it's the response</span></span>
+<span id="cb6-6"><a href="#cb6-6"></a>  y <span class="ot">&lt;-</span> <span class="fu">OBS</span>(y)</span>
+<span id="cb6-7"><a href="#cb6-7"></a></span>
+<span id="cb6-8"><a href="#cb6-8"></a>  <span class="co"># Specify the parameters transformation</span></span>
+<span id="cb6-9"><a href="#cb6-9"></a>  <span class="co"># Transform standard deviations</span></span>
+<span id="cb6-10"><a href="#cb6-10"></a>  <span class="co"># exp(par) is a trick to make sure that the estimated sd &gt; 0</span></span>
+<span id="cb6-11"><a href="#cb6-11"></a>  sdp <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdP)</span>
+<span id="cb6-12"><a href="#cb6-12"></a>  sdo <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdO)</span>
+<span id="cb6-13"><a href="#cb6-13"></a>  </span>
+<span id="cb6-14"><a href="#cb6-14"></a>  <span class="do">## Initialize joint negative log likelihood</span></span>
+<span id="cb6-15"><a href="#cb6-15"></a>  nll <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb6-16"><a href="#cb6-16"></a></span>
+<span id="cb6-17"><a href="#cb6-17"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
+<span id="cb6-18"><a href="#cb6-18"></a>  <span class="co"># of the process equation for t=1,...,T</span></span>
+<span id="cb6-19"><a href="#cb6-19"></a>  <span class="co"># Remember that we fixed z_0 = 0</span></span>
+<span id="cb6-20"><a href="#cb6-20"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">2</span><span class="sc">:</span><span class="fu">length</span>(z)){</span>
+<span id="cb6-21"><a href="#cb6-21"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(z[i], <span class="at">mean=</span>z[i<span class="dv">-1</span>], <span class="at">sd=</span>sdp, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
+<span id="cb6-22"><a href="#cb6-22"></a>  }</span>
+<span id="cb6-23"><a href="#cb6-23"></a>  </span>
+<span id="cb6-24"><a href="#cb6-24"></a>  </span>
+<span id="cb6-25"><a href="#cb6-25"></a>   </span>
+<span id="cb6-26"><a href="#cb6-26"></a>  </span>
+<span id="cb6-27"><a href="#cb6-27"></a></span>
+<span id="cb6-28"><a href="#cb6-28"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
+<span id="cb6-29"><a href="#cb6-29"></a>  <span class="co"># of the observation equation for t=1,...,T</span></span>
+<span id="cb6-30"><a href="#cb6-30"></a>  <span class="co"># Remember, the first element of z is at t=0,</span></span>
+<span id="cb6-31"><a href="#cb6-31"></a>  <span class="co"># while the first element of y is at t=1</span></span>
+<span id="cb6-32"><a href="#cb6-32"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(y)){</span>
+<span id="cb6-33"><a href="#cb6-33"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(y[i], <span class="at">mean=</span>z[i<span class="sc">+</span><span class="dv">1</span>], <span class="at">sd=</span>sdo, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
+<span id="cb6-34"><a href="#cb6-34"></a>  }</span>
+<span id="cb6-35"><a href="#cb6-35"></a>  </span>
+<span id="cb6-36"><a href="#cb6-36"></a>   </span>
+<span id="cb6-37"><a href="#cb6-37"></a>    </span>
+<span id="cb6-38"><a href="#cb6-38"></a>  <span class="co"># State the transformed parameters to report</span></span>
+<span id="cb6-39"><a href="#cb6-39"></a>  <span class="co"># Using ADREPORT will return the point values and the standard errors</span></span>
+<span id="cb6-40"><a href="#cb6-40"></a>  <span class="co"># Note that we only need to specify this for parameters</span></span>
+<span id="cb6-41"><a href="#cb6-41"></a>  <span class="co"># we transformed, see section D above</span></span>
+<span id="cb6-42"><a href="#cb6-42"></a>  <span class="co"># The other parameters, including the random effects (states),</span></span>
+<span id="cb6-43"><a href="#cb6-43"></a>  <span class="co"># will be returned automatically</span></span>
+<span id="cb6-44"><a href="#cb6-44"></a>  <span class="fu">ADREPORT</span>(sdp)</span>
+<span id="cb6-45"><a href="#cb6-45"></a>  <span class="fu">ADREPORT</span>(sdo)</span>
+<span id="cb6-46"><a href="#cb6-46"></a></span>
+<span id="cb6-47"><a href="#cb6-47"></a>   <span class="co">#State that we want the negative log-likelihood to be returned</span></span>
+<span id="cb6-48"><a href="#cb6-48"></a>  <span class="co">#This is what the optimizer in R will minimize</span></span>
+<span id="cb6-49"><a href="#cb6-49"></a>  <span class="fu">return</span>(nll)</span>
+<span id="cb6-50"><a href="#cb6-50"></a>  </span>
+<span id="cb6-51"><a href="#cb6-51"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="preparing-the-model-for-fitting" class="level3">
 <h3 class="anchored" data-anchor-id="preparing-the-model-for-fitting">Preparing the model for fitting</h3>
 <p>First, we need to prepare the data. This is going to be a list with all the items found in the .cpp files that are of the type <code>DATA</code> (e.g., <code>DATA_VECTOR</code>). Here, we only have <code>y</code> which is the time series of observed values.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>dataTmb <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">y =</span> y)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1"></a>dataTmb <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">y =</span> y)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Second, we need a list with the parameters. Again the names need to match those in the .cpp file. These are the starting values for the parameters. Note that this includes both the parameters and the states.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>par2pTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">logSdP =</span> <span class="dv">0</span>, <span class="at">logSdO =</span> <span class="dv">0</span>,</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>             <span class="at">z=</span><span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(dataTmb<span class="sc">$</span>y)<span class="sc">+</span><span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1"></a>par2pTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">logSdP =</span> <span class="dv">0</span>, <span class="at">logSdO =</span> <span class="dv">0</span>,</span>
+<span id="cb8-2"><a href="#cb8-2"></a>             <span class="at">z=</span><span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(dataTmb<span class="sc">$</span>y)<span class="sc">+</span><span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>By default all values of <code>par2pTmb</code> will be estimated, but we assume that we know the value of the state at time 0, <span class="math inline">\(z_0 = 0\)</span>. To provide this information, we can create a named list that we will input for the argument <code>map</code> of the function <code>MakeADFun</code> below. The elements of <code>map</code> should have the same name and size as those in <code>par2pTmb</code>, but we only need to specify the elements that we want to manipulate, here <code>par2pTmb$z</code>. To fix a value, we set that value to <code>NA</code>. The values that are estimated should have a different entry and all values should be factors.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>mapTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">z=</span><span class="fu">as.factor</span>(<span class="fu">c</span>(<span class="cn">NA</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(dataTmb<span class="sc">$</span>y))))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a>mapTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">z=</span><span class="fu">as.factor</span>(<span class="fu">c</span>(<span class="cn">NA</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(dataTmb<span class="sc">$</span>y))))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Before we can fit the model, we need to use the function <code>MakeADFun</code> to combine the data, the parameters, and the model and create a function that calculates the negative log likelihood and the gradients.</p>
 <p>To identify our random effects, namely the states, <span class="math inline">\(z_t\)</span>, we set the argument <code>random</code> to equal the name of the parameters that are random effects. The argument <code>DLL</code> identify the compiled C++ function to be linked.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>m2pTmb <span class="ot">&lt;-</span> RTMB<span class="sc">::</span><span class="fu">MakeADFun</span>(toy2p, </span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>                    <span class="at">parameters =</span> par2pTmb, </span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>                    <span class="at">map =</span> mapTmb, </span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>                    <span class="at">random =</span> <span class="st">"z"</span>,</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>                    <span class="at">silent =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1"></a>m2pTmb <span class="ot">&lt;-</span> RTMB<span class="sc">::</span><span class="fu">MakeADFun</span>(toy2p, </span>
+<span id="cb10-2"><a href="#cb10-2"></a>                    <span class="at">parameters =</span> par2pTmb, </span>
+<span id="cb10-3"><a href="#cb10-3"></a>                    <span class="at">map =</span> mapTmb, </span>
+<span id="cb10-4"><a href="#cb10-4"></a>                    <span class="at">random =</span> <span class="st">"z"</span>,</span>
+<span id="cb10-5"><a href="#cb10-5"></a>                    <span class="at">silent =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="fitting-the-model-to-data" class="level3">
 <h3 class="anchored" data-anchor-id="fitting-the-model-to-data">Fitting the model to data</h3>
 <p>We fit the model using <code>nlminb</code>, which is a base R optimizer, but we input the object returned by <code>MakeADFun</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>f2pTmb <span class="ot">&lt;-</span> <span class="fu">nlminb</span>(<span class="at">start =</span> m2pTmb<span class="sc">$</span>par, <span class="co"># Initial values for the parameters</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">objective =</span> m2pTmb<span class="sc">$</span>fn, <span class="co"># Function to be minimized</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">gradient =</span> m2pTmb<span class="sc">$</span>gr) <span class="co"># Gradient of the objective</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1"></a>f2pTmb <span class="ot">&lt;-</span> <span class="fu">nlminb</span>(<span class="at">start =</span> m2pTmb<span class="sc">$</span>par, <span class="co"># Initial values for the parameters</span></span>
+<span id="cb11-2"><a href="#cb11-2"></a>                 <span class="at">objective =</span> m2pTmb<span class="sc">$</span>fn, <span class="co"># Function to be minimized</span></span>
+<span id="cb11-3"><a href="#cb11-3"></a>                 <span class="at">gradient =</span> m2pTmb<span class="sc">$</span>gr) <span class="co"># Gradient of the objective</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>It is important to check whether the model converged.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>f2pTmb<span class="sc">$</span>message</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1"></a>f2pTmb<span class="sc">$</span>message</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] "relative convergence (4)"</code></pre>
 </div>
@@ -348,11 +349,11 @@ pre.numberSource code
 <h3 class="anchored" data-anchor-id="exploring-the-results">Exploring the results</h3>
 <p>To look at the parameter estimates, you can use the function <code>sdreport</code> and object object created by <code>MakeADFun</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>sdr2pTmb <span class="ot">&lt;-</span> <span class="fu">summary</span>(<span class="fu">sdreport</span>(m2pTmb))</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="co"># This will have the parameters and states</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="co"># So we can just print the parameters</span></span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="fu">cbind</span>(<span class="st">"Simulated"</span> <span class="ot">=</span> <span class="fu">c</span>(sdp, sdo),</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  sdr2pTmb[<span class="fu">c</span>(<span class="st">"sdp"</span>, <span class="st">"sdo"</span>),])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1"></a>sdr2pTmb <span class="ot">&lt;-</span> <span class="fu">summary</span>(<span class="fu">sdreport</span>(m2pTmb))</span>
+<span id="cb14-2"><a href="#cb14-2"></a><span class="co"># This will have the parameters and states</span></span>
+<span id="cb14-3"><a href="#cb14-3"></a><span class="co"># So we can just print the parameters</span></span>
+<span id="cb14-4"><a href="#cb14-4"></a><span class="fu">cbind</span>(<span class="st">"Simulated"</span> <span class="ot">=</span> <span class="fu">c</span>(sdp, sdo),</span>
+<span id="cb14-5"><a href="#cb14-5"></a>  sdr2pTmb[<span class="fu">c</span>(<span class="st">"sdp"</span>, <span class="st">"sdo"</span>),])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>    Simulated  Estimate Std. Error
 sdp       0.1 0.1174192 0.01215134
@@ -362,9 +363,9 @@ sdo       0.1 0.0914208 0.01077956</code></pre>
 <p>We can see that the estimates for both the process variation and the observation error are close to their true value of 0.1, with relatively small standard errors (SEs).</p>
 <p>We can get the smoothed state values with the <code>sdreport</code> function as above and this will give you the SEs for these states. If you are only interested in the state values (not theis SEs), you can also extract them directly from the model object.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># To get the point estimate and the SE of the states</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>zsSe2pTmb <span class="ot">&lt;-</span> sdr2pTmb[<span class="fu">row.names</span>(sdr2pTmb)<span class="sc">==</span><span class="st">"z"</span>,]</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(zsSe2pTmb)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1"></a><span class="co"># To get the point estimate and the SE of the states</span></span>
+<span id="cb16-2"><a href="#cb16-2"></a>zsSe2pTmb <span class="ot">&lt;-</span> sdr2pTmb[<span class="fu">row.names</span>(sdr2pTmb)<span class="sc">==</span><span class="st">"z"</span>,]</span>
+<span id="cb16-3"><a href="#cb16-3"></a><span class="fu">head</span>(zsSe2pTmb)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>      Estimate Std. Error
 z  0.002425299 0.06414118
@@ -374,9 +375,9 @@ z -0.036653040 0.06740099
 z -0.037413169 0.06720760
 z -0.064181179 0.06723443</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># To get only the point estimates of the states</span></span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>zs2pTmb <span class="ot">&lt;-</span> m2pTmb<span class="sc">$</span>env<span class="sc">$</span><span class="fu">parList</span>()<span class="sc">$</span>z</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(zs2pTmb)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1"></a><span class="co"># To get only the point estimates of the states</span></span>
+<span id="cb18-2"><a href="#cb18-2"></a>zs2pTmb <span class="ot">&lt;-</span> m2pTmb<span class="sc">$</span>env<span class="sc">$</span><span class="fu">parList</span>()<span class="sc">$</span>z</span>
+<span id="cb18-3"><a href="#cb18-3"></a><span class="fu">head</span>(zs2pTmb)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1]  0.000000000  0.002424767  0.002620967  0.042203573 -0.036679365
 [6] -0.037408983</code></pre>
@@ -385,30 +386,30 @@ z -0.064181179 0.06723443</code></pre>
 <p>Note that in this case, because we fixed the value of the state at time <span class="math inline">\(t=0\)</span>, the first method, which looks at the predicted values, only returns state values for <span class="math inline">\(t&gt;0\)</span>.</p>
 <p>We can use the SEs to calculate the 95% confidence intervals.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>zsCIl2pTmb <span class="ot">&lt;-</span> zsSe2pTmb[,<span class="dv">1</span>] <span class="sc">+</span> </span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">qnorm</span>(<span class="fl">0.025</span>, <span class="at">sd =</span> zsSe2pTmb[,<span class="dv">2</span>])</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>zsCIu2pTmb <span class="ot">&lt;-</span> zsSe2pTmb[,<span class="dv">1</span>] <span class="sc">+</span> </span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">qnorm</span>(<span class="fl">0.975</span>, <span class="at">sd =</span> zsSe2pTmb[,<span class="dv">2</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1"></a>zsCIl2pTmb <span class="ot">&lt;-</span> zsSe2pTmb[,<span class="dv">1</span>] <span class="sc">+</span> </span>
+<span id="cb20-2"><a href="#cb20-2"></a>  <span class="fu">qnorm</span>(<span class="fl">0.025</span>, <span class="at">sd =</span> zsSe2pTmb[,<span class="dv">2</span>])</span>
+<span id="cb20-3"><a href="#cb20-3"></a>zsCIu2pTmb <span class="ot">&lt;-</span> zsSe2pTmb[,<span class="dv">1</span>] <span class="sc">+</span> </span>
+<span id="cb20-4"><a href="#cb20-4"></a>  <span class="fu">qnorm</span>(<span class="fl">0.975</span>, <span class="at">sd =</span> zsSe2pTmb[,<span class="dv">2</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We can now overlay the state estimates along with their confidence intervals on the plot of the simulated data.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="dv">1</span><span class="sc">:</span>TT, y,</span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex=</span><span class="fl">0.8</span>, <span class="at">col=</span><span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty =</span> <span class="dv">3</span>,</span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">"t"</span>, <span class="at">ylab =</span> <span class="fu">expression</span>(z[t]),</span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlim =</span> <span class="fu">c</span>(<span class="dv">0</span>,TT), <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fu">min</span>(y), <span class="fu">max</span>(y)<span class="sc">+</span><span class="fu">max</span>(y)<span class="sc">/</span><span class="dv">5</span>),</span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>     <span class="at">las =</span> <span class="dv">1</span>)</span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(<span class="dv">0</span><span class="sc">:</span>TT, z,</span>
-<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">pch=</span><span class="dv">19</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">ty=</span><span class="st">"o"</span>)</span>
-<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="fu">polygon</span>(<span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span>TT, TT<span class="sc">:</span><span class="dv">1</span>), <span class="fu">c</span>(zsCIl2pTmb,<span class="fu">rev</span>(zsCIu2pTmb)),</span>
-<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>        <span class="at">col=</span><span class="fu">rgb</span>(<span class="dv">1</span>,<span class="fl">0.7</span>,<span class="fl">0.4</span>,<span class="fl">0.3</span>), <span class="at">border=</span><span class="cn">FALSE</span>)</span>
-<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(<span class="dv">0</span><span class="sc">:</span>TT, zs2pTmb, </span>
-<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>      <span class="at">col=</span> <span class="st">"darkgoldenrod1"</span>, <span class="at">lwd =</span> <span class="dv">2</span>)</span>
-<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"top"</span>,</span>
-<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>       <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Obs."</span>, <span class="st">"True states"</span>, <span class="st">"Smooth. states"</span>),</span>
-<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>       <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">19</span>, <span class="cn">NA</span>),</span>
-<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"blue"</span>, <span class="st">"red"</span>, <span class="st">"darkgoldenrod1"</span>),</span>
-<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>       <span class="at">lwd =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">2</span>), <span class="at">lty =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">1</span>),</span>
-<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>       <span class="at">horiz=</span><span class="cn">TRUE</span>, <span class="at">bty=</span><span class="st">"n"</span>, <span class="at">cex=</span><span class="fl">0.9</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1"></a><span class="fu">plot</span>(<span class="dv">1</span><span class="sc">:</span>TT, y,</span>
+<span id="cb21-2"><a href="#cb21-2"></a>     <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex=</span><span class="fl">0.8</span>, <span class="at">col=</span><span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty =</span> <span class="dv">3</span>,</span>
+<span id="cb21-3"><a href="#cb21-3"></a>     <span class="at">xlab =</span> <span class="st">"t"</span>, <span class="at">ylab =</span> <span class="fu">expression</span>(z[t]),</span>
+<span id="cb21-4"><a href="#cb21-4"></a>     <span class="at">xlim =</span> <span class="fu">c</span>(<span class="dv">0</span>,TT), <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fu">min</span>(y), <span class="fu">max</span>(y)<span class="sc">+</span><span class="fu">max</span>(y)<span class="sc">/</span><span class="dv">5</span>),</span>
+<span id="cb21-5"><a href="#cb21-5"></a>     <span class="at">las =</span> <span class="dv">1</span>)</span>
+<span id="cb21-6"><a href="#cb21-6"></a><span class="fu">points</span>(<span class="dv">0</span><span class="sc">:</span>TT, z,</span>
+<span id="cb21-7"><a href="#cb21-7"></a>       <span class="at">pch=</span><span class="dv">19</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">ty=</span><span class="st">"o"</span>)</span>
+<span id="cb21-8"><a href="#cb21-8"></a><span class="fu">polygon</span>(<span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span>TT, TT<span class="sc">:</span><span class="dv">1</span>), <span class="fu">c</span>(zsCIl2pTmb,<span class="fu">rev</span>(zsCIu2pTmb)),</span>
+<span id="cb21-9"><a href="#cb21-9"></a>        <span class="at">col=</span><span class="fu">rgb</span>(<span class="dv">1</span>,<span class="fl">0.7</span>,<span class="fl">0.4</span>,<span class="fl">0.3</span>), <span class="at">border=</span><span class="cn">FALSE</span>)</span>
+<span id="cb21-10"><a href="#cb21-10"></a><span class="fu">lines</span>(<span class="dv">0</span><span class="sc">:</span>TT, zs2pTmb, </span>
+<span id="cb21-11"><a href="#cb21-11"></a>      <span class="at">col=</span> <span class="st">"darkgoldenrod1"</span>, <span class="at">lwd =</span> <span class="dv">2</span>)</span>
+<span id="cb21-12"><a href="#cb21-12"></a><span class="fu">legend</span>(<span class="st">"top"</span>,</span>
+<span id="cb21-13"><a href="#cb21-13"></a>       <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Obs."</span>, <span class="st">"True states"</span>, <span class="st">"Smooth. states"</span>),</span>
+<span id="cb21-14"><a href="#cb21-14"></a>       <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">19</span>, <span class="cn">NA</span>),</span>
+<span id="cb21-15"><a href="#cb21-15"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"blue"</span>, <span class="st">"red"</span>, <span class="st">"darkgoldenrod1"</span>),</span>
+<span id="cb21-16"><a href="#cb21-16"></a>       <span class="at">lwd =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">2</span>), <span class="at">lty =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb21-17"><a href="#cb21-17"></a>       <span class="at">horiz=</span><span class="cn">TRUE</span>, <span class="at">bty=</span><span class="st">"n"</span>, <span class="at">cex=</span><span class="fl">0.9</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -428,10 +429,10 @@ z -0.064181179 0.06723443</code></pre>
 <p>Using the data set available through Dryad Auger-Méthé and Derocher (2021) doi:10.5061/dryad.4qrfj6q96, we will explore a classic state-space model for Argos movement data, which is highly error prone.</p>
 <p>Let us load the Argos data.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Read the data</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>dataPbA <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">"Data/PB_Argos.csv"</span>)</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Look at what it contains</span></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(dataPbA)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1"></a><span class="co"># Read the data</span></span>
+<span id="cb22-2"><a href="#cb22-2"></a>dataPbA <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">"Data/PB_Argos.csv"</span>)</span>
+<span id="cb22-3"><a href="#cb22-3"></a><span class="co"># Look at what it contains</span></span>
+<span id="cb22-4"><a href="#cb22-4"></a><span class="fu">head</span>(dataPbA)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>             DateTime QualClass    Lat      Lon
 1 2009.04.20 17:01:39         B 70.365 -131.837
@@ -445,8 +446,8 @@ z -0.064181179 0.06723443</code></pre>
 <p>We can see that we have a column with the date and time, one with the Argos quality class, one with the latitude and one with the longitude.</p>
 <p>Let us plot the data.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(dataPbA[,<span class="fu">c</span>(<span class="st">"Lon"</span>, <span class="st">"Lat"</span>)], </span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty=</span><span class="dv">3</span>, <span class="at">las=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1"></a><span class="fu">plot</span>(dataPbA[,<span class="fu">c</span>(<span class="st">"Lon"</span>, <span class="st">"Lat"</span>)], </span>
+<span id="cb24-2"><a href="#cb24-2"></a>     <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty=</span><span class="dv">3</span>, <span class="at">las=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -459,47 +460,47 @@ z -0.064181179 0.06723443</code></pre>
 <p>In Appendix S1 of Auger-Méthé et al.&nbsp;2021, you can see how this movement compares to the GPS tracks.</p>
 <p>Here we will use the Argos data to estimate states at regular time intervals. We will estimate states once a day at 17:00. The following code chunk is just data manipulation to create the <span class="math inline">\(i\)</span> index and the time proportion <span class="math inline">\(j_i\)</span> so that we relate the time of the observed Argos locations to these fix time intervals.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Transform DateTime in R date.time class</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>dataPbA<span class="sc">$</span>Time <span class="ot">&lt;-</span> <span class="fu">as.POSIXlt</span>(dataPbA<span class="sc">$</span>DateTime,</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>                       <span class="at">format=</span><span class="st">"%Y.%m.%d %H:%M:%S"</span>, <span class="at">tz=</span><span class="st">"UTC"</span>)</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>dataPbA<span class="sc">$</span>Date <span class="ot">&lt;-</span> <span class="fu">as.Date</span>(dataPbA<span class="sc">$</span>Time)</span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a regular time series that will</span></span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a><span class="co"># represent the time at which we will estimate the states (z)</span></span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Note that because our last Argos location is after 17:00,</span></span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a><span class="co"># we end time series one day after</span></span>
-<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>allDays <span class="ot">&lt;-</span> <span class="fu">seq</span>(dataPbA<span class="sc">$</span>Date[<span class="dv">1</span>],</span>
-<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>               dataPbA<span class="sc">$</span>Date[<span class="fu">length</span>(dataPbA<span class="sc">$</span>Time)] <span class="sc">+</span> <span class="dv">1</span>, <span class="dv">1</span>)</span>
-<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>allDays <span class="ot">&lt;-</span> <span class="fu">as.POSIXlt</span>(<span class="fu">paste</span>(allDays, <span class="st">"17:00"</span>), <span class="at">tz=</span><span class="st">"UTC"</span>)</span>
-<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Find in between which z (allDays) observation y fall</span></span>
-<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a><span class="co"># +1 because the it's the proportion of time between t-1 and t, we link with t.</span></span>
-<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>dataPbA<span class="sc">$</span>idx <span class="ot">&lt;-</span> <span class="fu">findInterval</span>(dataPbA<span class="sc">$</span>Time,allDays) <span class="sc">+</span> <span class="dv">1</span></span>
-<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Checking how far from the z_t y is</span></span>
-<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>dataPbA<span class="sc">$</span>ji <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="dv">24</span><span class="sc">-</span><span class="fu">difftime</span>(allDays[dataPbA<span class="sc">$</span>idx],</span>
-<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>                                 dataPbA<span class="sc">$</span>Time, <span class="at">units=</span><span class="st">"hours"</span>))<span class="sc">/</span><span class="dv">24</span></span>
-<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a><span class="co"># dataPbA$ji &lt;- as.numeric(difftime(allDays[dataPbA$idx],</span></span>
-<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a><span class="co">#                                  dataPbA$Time, units="hours"))/24</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1"></a><span class="co"># Transform DateTime in R date.time class</span></span>
+<span id="cb25-2"><a href="#cb25-2"></a>dataPbA<span class="sc">$</span>Time <span class="ot">&lt;-</span> <span class="fu">as.POSIXlt</span>(dataPbA<span class="sc">$</span>DateTime,</span>
+<span id="cb25-3"><a href="#cb25-3"></a>                       <span class="at">format=</span><span class="st">"%Y.%m.%d %H:%M:%S"</span>, <span class="at">tz=</span><span class="st">"UTC"</span>)</span>
+<span id="cb25-4"><a href="#cb25-4"></a>dataPbA<span class="sc">$</span>Date <span class="ot">&lt;-</span> <span class="fu">as.Date</span>(dataPbA<span class="sc">$</span>Time)</span>
+<span id="cb25-5"><a href="#cb25-5"></a></span>
+<span id="cb25-6"><a href="#cb25-6"></a><span class="co"># Create a regular time series that will</span></span>
+<span id="cb25-7"><a href="#cb25-7"></a><span class="co"># represent the time at which we will estimate the states (z)</span></span>
+<span id="cb25-8"><a href="#cb25-8"></a><span class="co"># Note that because our last Argos location is after 17:00,</span></span>
+<span id="cb25-9"><a href="#cb25-9"></a><span class="co"># we end time series one day after</span></span>
+<span id="cb25-10"><a href="#cb25-10"></a>allDays <span class="ot">&lt;-</span> <span class="fu">seq</span>(dataPbA<span class="sc">$</span>Date[<span class="dv">1</span>],</span>
+<span id="cb25-11"><a href="#cb25-11"></a>               dataPbA<span class="sc">$</span>Date[<span class="fu">length</span>(dataPbA<span class="sc">$</span>Time)] <span class="sc">+</span> <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb25-12"><a href="#cb25-12"></a>allDays <span class="ot">&lt;-</span> <span class="fu">as.POSIXlt</span>(<span class="fu">paste</span>(allDays, <span class="st">"17:00"</span>), <span class="at">tz=</span><span class="st">"UTC"</span>)</span>
+<span id="cb25-13"><a href="#cb25-13"></a></span>
+<span id="cb25-14"><a href="#cb25-14"></a><span class="co"># Find in between which z (allDays) observation y fall</span></span>
+<span id="cb25-15"><a href="#cb25-15"></a><span class="co"># +1 because the it's the proportion of time between t-1 and t, we link with t.</span></span>
+<span id="cb25-16"><a href="#cb25-16"></a>dataPbA<span class="sc">$</span>idx <span class="ot">&lt;-</span> <span class="fu">findInterval</span>(dataPbA<span class="sc">$</span>Time,allDays) <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb25-17"><a href="#cb25-17"></a><span class="co"># Checking how far from the z_t y is</span></span>
+<span id="cb25-18"><a href="#cb25-18"></a>dataPbA<span class="sc">$</span>ji <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="dv">24</span><span class="sc">-</span><span class="fu">difftime</span>(allDays[dataPbA<span class="sc">$</span>idx],</span>
+<span id="cb25-19"><a href="#cb25-19"></a>                                 dataPbA<span class="sc">$</span>Time, <span class="at">units=</span><span class="st">"hours"</span>))<span class="sc">/</span><span class="dv">24</span></span>
+<span id="cb25-20"><a href="#cb25-20"></a></span>
+<span id="cb25-21"><a href="#cb25-21"></a><span class="co"># dataPbA$ji &lt;- as.numeric(difftime(allDays[dataPbA$idx],</span></span>
+<span id="cb25-22"><a href="#cb25-22"></a><span class="co">#                                  dataPbA$Time, units="hours"))/24</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package <code>bsam</code> (Jonsen et al.&nbsp;2005). We have done a few changes to the values used in <code>bsam</code>. In particular, the skewness of the t-distribution is undefined when the degree of freedom is <span class="math inline">\(\leq 3\)</span>. We have thus set any degree of freedom values smaller or equal to 3 to 3.00001.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>ArgosC <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="at">nrow=</span><span class="dv">6</span>, <span class="at">ncol=</span><span class="dv">4</span>)</span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(ArgosC) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"TLon"</span>,<span class="st">"NuLon"</span>,<span class="st">"TLat"</span>,<span class="st">"NuLat"</span>)</span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>ArgosC[,<span class="st">"TLon"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.037842190</span>, <span class="fl">0.004565261</span>, <span class="fl">0.019461776</span>,</span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>                     <span class="fl">0.008117727</span>, <span class="fl">0.002807138</span>, <span class="fl">0.002608584</span>)</span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>ArgosC[,<span class="st">"TLat"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.027369282</span>, <span class="fl">0.004594551</span>, <span class="fl">0.014462340</span>,</span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>                     <span class="fl">0.004142703</span>, <span class="fl">0.002344425</span>, <span class="fl">0.001098409</span>)</span>
-<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>ArgosC[,<span class="st">"NuLon"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">3.00001</span>, <span class="fl">3.00001</span>, <span class="fl">3.00001</span>,</span>
-<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>                      <span class="fl">3.00001</span>, <span class="fl">3.00001</span>, <span class="fl">3.070609</span>)</span>
-<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>ArgosC[,<span class="st">"NuLat"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">3.00001</span>, <span class="fl">3.00001</span>, <span class="fl">3.00001</span>,</span>
-<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>                      <span class="fl">3.896554</span>, <span class="fl">6.314726</span>, <span class="fl">3.00001</span>)</span>
-<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(ArgosC) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"B"</span>, <span class="st">"A"</span>, <span class="st">"0"</span>,</span>
-<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"1"</span>, <span class="st">"2"</span>, <span class="st">"3"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1"></a>ArgosC <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="at">nrow=</span><span class="dv">6</span>, <span class="at">ncol=</span><span class="dv">4</span>)</span>
+<span id="cb26-2"><a href="#cb26-2"></a><span class="fu">colnames</span>(ArgosC) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"TLon"</span>,<span class="st">"NuLon"</span>,<span class="st">"TLat"</span>,<span class="st">"NuLat"</span>)</span>
+<span id="cb26-3"><a href="#cb26-3"></a>ArgosC[,<span class="st">"TLon"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.037842190</span>, <span class="fl">0.004565261</span>, <span class="fl">0.019461776</span>,</span>
+<span id="cb26-4"><a href="#cb26-4"></a>                     <span class="fl">0.008117727</span>, <span class="fl">0.002807138</span>, <span class="fl">0.002608584</span>)</span>
+<span id="cb26-5"><a href="#cb26-5"></a>ArgosC[,<span class="st">"TLat"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">0.027369282</span>, <span class="fl">0.004594551</span>, <span class="fl">0.014462340</span>,</span>
+<span id="cb26-6"><a href="#cb26-6"></a>                     <span class="fl">0.004142703</span>, <span class="fl">0.002344425</span>, <span class="fl">0.001098409</span>)</span>
+<span id="cb26-7"><a href="#cb26-7"></a>ArgosC[,<span class="st">"NuLon"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">3.00001</span>, <span class="fl">3.00001</span>, <span class="fl">3.00001</span>,</span>
+<span id="cb26-8"><a href="#cb26-8"></a>                      <span class="fl">3.00001</span>, <span class="fl">3.00001</span>, <span class="fl">3.070609</span>)</span>
+<span id="cb26-9"><a href="#cb26-9"></a>ArgosC[,<span class="st">"NuLat"</span>] <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">3.00001</span>, <span class="fl">3.00001</span>, <span class="fl">3.00001</span>,</span>
+<span id="cb26-10"><a href="#cb26-10"></a>                      <span class="fl">3.896554</span>, <span class="fl">6.314726</span>, <span class="fl">3.00001</span>)</span>
+<span id="cb26-11"><a href="#cb26-11"></a><span class="fu">rownames</span>(ArgosC) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"B"</span>, <span class="st">"A"</span>, <span class="st">"0"</span>,</span>
+<span id="cb26-12"><a href="#cb26-12"></a>                      <span class="st">"1"</span>, <span class="st">"2"</span>, <span class="st">"3"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Now we create new columns in the data set that indicate the standard deviation and the degrees of freedom to use with each location.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>dataPbA<span class="sc">$</span>ac <span class="ot">&lt;-</span> ArgosC[<span class="fu">as.character</span>(dataPbA<span class="sc">$</span>QualClass),]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1"></a>dataPbA<span class="sc">$</span>ac <span class="ot">&lt;-</span> ArgosC[<span class="fu">as.character</span>(dataPbA<span class="sc">$</span>QualClass),]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <section id="fitting-the-model-and-checking-model-fit" class="level2">
 <h2 class="anchored" data-anchor-id="fitting-the-model-and-checking-model-fit">Fitting the model and checking model fit</h2>
@@ -507,111 +508,111 @@ z -0.064181179 0.06723443</code></pre>
 <h3 class="anchored" data-anchor-id="create-the-c-code-defining-the-negative-log-likelihood">Create the C++ code defining the negative log-likelihood</h3>
 <p>Again, the first thing we need to do to be able to fit the model in <code>TMB</code> is to create a file that will contain the C++ code to evaluate the negative log-likelihood value of the model. We will name the file <strong>dcrw.cpp</strong>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>dcrw <span class="ot">&lt;-</span> <span class="cf">function</span>(parms){</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Make items within dataPbTmb and parms easily available</span></span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">getAll</span>(dataPbTmb, parms, <span class="at">warn=</span><span class="cn">FALSE</span>)</span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Tell TMB y is the response variable</span></span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>  y <span class="ot">&lt;-</span> <span class="fu">OBS</span>(y)</span>
-<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Transformation of the input parameters to model format</span></span>
-<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># These transformations are made to insured that</span></span>
-<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the parameters have sensical values.</span></span>
-<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># They do not change the model, </span></span>
-<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># they are only a computational trick.</span></span>
-<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>  gamma <span class="ot">&lt;-</span> <span class="fl">1.0</span><span class="sc">/</span>(<span class="fl">1.0</span><span class="sc">+</span><span class="fu">exp</span>(<span class="sc">-</span>logitGamma)) <span class="co"># b/c we want 0 &lt; gamma &lt; 1</span></span>
-<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>  sdLon <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdLon) <span class="co"># b/c we want sd &gt; 0</span></span>
-<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>  sdLat <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdLat) <span class="co"># b/c we want sd &gt; 0</span></span>
-<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>  psiLon <span class="ot">&lt;-</span> <span class="fu">exp</span>(logPsiLon) <span class="co"># b/c we want psi &gt; 0</span></span>
-<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a>  psiLat <span class="ot">&lt;-</span> <span class="fu">exp</span>(logPsiLat) <span class="co"># b/c we want psi &gt; 0</span></span>
-<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Initializing the model</span></span>
-<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># For the 2nd time step, we assume that we have a simple random walk:</span></span>
-<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># z_1 = z_0 + eta</span></span>
-<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># We are assuming independence between coordinates</span></span>
-<span id="cb28-22"><a href="#cb28-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Thus using two univariate normals</span></span>
-<span id="cb28-23"><a href="#cb28-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Start with lon, lat</span></span>
-<span id="cb28-24"><a href="#cb28-24" aria-hidden="true" tabindex="-1"></a>  nll <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">dnorm</span>(z[<span class="dv">2</span>,], <span class="at">mean =</span> z[<span class="dv">1</span>,], <span class="at">sd =</span> <span class="fu">c</span>(sdLon, sdLat), <span class="at">log=</span><span class="cn">TRUE</span>))</span>
-<span id="cb28-25"><a href="#cb28-25" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb28-26"><a href="#cb28-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># nll contribution of the process equation after the 2nd time step</span></span>
-<span id="cb28-27"><a href="#cb28-27" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">3</span><span class="sc">:</span><span class="fu">nrow</span>(z)){</span>
-<span id="cb28-28"><a href="#cb28-28" aria-hidden="true" tabindex="-1"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">sum</span>(</span>
-<span id="cb28-29"><a href="#cb28-29" aria-hidden="true" tabindex="-1"></a>      <span class="fu">dnorm</span>(z[i,], </span>
-<span id="cb28-30"><a href="#cb28-30" aria-hidden="true" tabindex="-1"></a>            <span class="at">mean =</span> z[i<span class="dv">-1</span>,] <span class="sc">+</span> gamma<span class="sc">*</span>(z[i<span class="dv">-1</span>,] <span class="sc">-</span> z[i<span class="dv">-2</span>,]), </span>
-<span id="cb28-31"><a href="#cb28-31" aria-hidden="true" tabindex="-1"></a>            <span class="at">sd =</span> <span class="fu">c</span>(sdLon, sdLat), </span>
-<span id="cb28-32"><a href="#cb28-32" aria-hidden="true" tabindex="-1"></a>            <span class="at">log =</span> <span class="cn">TRUE</span>))</span>
-<span id="cb28-33"><a href="#cb28-33" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb28-34"><a href="#cb28-34" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb28-35"><a href="#cb28-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># nll contribution of the observation equation</span></span>
-<span id="cb28-36"><a href="#cb28-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># The loop here is just the size of the observation vector.</span></span>
-<span id="cb28-37"><a href="#cb28-37" aria-hidden="true" tabindex="-1"></a>  <span class="co"># We use the time index found in idx to relate</span></span>
-<span id="cb28-38"><a href="#cb28-38" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the appropriate state to the observation.</span></span>
-<span id="cb28-39"><a href="#cb28-39" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(y)){</span>
-<span id="cb28-40"><a href="#cb28-40" aria-hidden="true" tabindex="-1"></a>    <span class="co"># We are using the non-standardised t distribution,</span></span>
-<span id="cb28-41"><a href="#cb28-41" aria-hidden="true" tabindex="-1"></a>    <span class="co"># that is why we are correcting the pdf.</span></span>
-<span id="cb28-42"><a href="#cb28-42" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Interpolate the value at time of observation</span></span>
-<span id="cb28-43"><a href="#cb28-43" aria-hidden="true" tabindex="-1"></a>    tmp <span class="ot">&lt;-</span> y[i,] <span class="sc">-</span></span>
-<span id="cb28-44"><a href="#cb28-44" aria-hidden="true" tabindex="-1"></a>      ((<span class="dv">1</span><span class="sc">-</span>ji[i])<span class="sc">*</span>z[idx[i]<span class="sc">-</span><span class="dv">1</span>,] <span class="sc">+</span></span>
-<span id="cb28-45"><a href="#cb28-45" aria-hidden="true" tabindex="-1"></a>      ji[i]<span class="sc">*</span>z[idx[i],])</span>
-<span id="cb28-46"><a href="#cb28-46" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb28-47"><a href="#cb28-47" aria-hidden="true" tabindex="-1"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">sum</span>(</span>
-<span id="cb28-48"><a href="#cb28-48" aria-hidden="true" tabindex="-1"></a>      <span class="fu">log</span>(<span class="dv">1</span><span class="sc">/</span>(<span class="fu">c</span>(psiLon, psiLat)<span class="sc">*</span>ac[i,<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>)])) <span class="sc">+</span></span>
-<span id="cb28-49"><a href="#cb28-49" aria-hidden="true" tabindex="-1"></a>      <span class="fu">dt</span>(tmp<span class="sc">/</span>(<span class="fu">c</span>(psiLon, psiLat)<span class="sc">*</span>ac[i,<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>)]),</span>
-<span id="cb28-50"><a href="#cb28-50" aria-hidden="true" tabindex="-1"></a>         <span class="at">df =</span> ac[i,<span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">4</span>)],</span>
-<span id="cb28-51"><a href="#cb28-51" aria-hidden="true" tabindex="-1"></a>         <span class="at">log =</span> <span class="cn">TRUE</span>))</span>
-<span id="cb28-52"><a href="#cb28-52" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb28-53"><a href="#cb28-53" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb28-54"><a href="#cb28-54" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Report the parameters and their standard errors in their model format</span></span>
-<span id="cb28-55"><a href="#cb28-55" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ADREPORT</span>(gamma)</span>
-<span id="cb28-56"><a href="#cb28-56" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ADREPORT</span>(sdLon)</span>
-<span id="cb28-57"><a href="#cb28-57" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ADREPORT</span>(sdLat)</span>
-<span id="cb28-58"><a href="#cb28-58" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ADREPORT</span>(psiLon)</span>
-<span id="cb28-59"><a href="#cb28-59" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ADREPORT</span>(psiLat)</span>
-<span id="cb28-60"><a href="#cb28-60" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb28-61"><a href="#cb28-61" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(nll)</span>
-<span id="cb28-62"><a href="#cb28-62" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1"></a>dcrw <span class="ot">&lt;-</span> <span class="cf">function</span>(parms){</span>
+<span id="cb28-2"><a href="#cb28-2"></a>  <span class="co"># Make items within dataPbTmb and parms easily available</span></span>
+<span id="cb28-3"><a href="#cb28-3"></a>  <span class="fu">getAll</span>(dataPbTmb, parms, <span class="at">warn=</span><span class="cn">FALSE</span>)</span>
+<span id="cb28-4"><a href="#cb28-4"></a>  <span class="co"># Tell TMB y is the response variable</span></span>
+<span id="cb28-5"><a href="#cb28-5"></a>  y <span class="ot">&lt;-</span> <span class="fu">OBS</span>(y)</span>
+<span id="cb28-6"><a href="#cb28-6"></a>  </span>
+<span id="cb28-7"><a href="#cb28-7"></a>  <span class="co"># Transformation of the input parameters to model format</span></span>
+<span id="cb28-8"><a href="#cb28-8"></a>  <span class="co"># These transformations are made to insured that</span></span>
+<span id="cb28-9"><a href="#cb28-9"></a>  <span class="co"># the parameters have sensical values.</span></span>
+<span id="cb28-10"><a href="#cb28-10"></a>  <span class="co"># They do not change the model, </span></span>
+<span id="cb28-11"><a href="#cb28-11"></a>  <span class="co"># they are only a computational trick.</span></span>
+<span id="cb28-12"><a href="#cb28-12"></a>  gamma <span class="ot">&lt;-</span> <span class="fl">1.0</span><span class="sc">/</span>(<span class="fl">1.0</span><span class="sc">+</span><span class="fu">exp</span>(<span class="sc">-</span>logitGamma)) <span class="co"># b/c we want 0 &lt; gamma &lt; 1</span></span>
+<span id="cb28-13"><a href="#cb28-13"></a>  sdLon <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdLon) <span class="co"># b/c we want sd &gt; 0</span></span>
+<span id="cb28-14"><a href="#cb28-14"></a>  sdLat <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdLat) <span class="co"># b/c we want sd &gt; 0</span></span>
+<span id="cb28-15"><a href="#cb28-15"></a>  psiLon <span class="ot">&lt;-</span> <span class="fu">exp</span>(logPsiLon) <span class="co"># b/c we want psi &gt; 0</span></span>
+<span id="cb28-16"><a href="#cb28-16"></a>  psiLat <span class="ot">&lt;-</span> <span class="fu">exp</span>(logPsiLat) <span class="co"># b/c we want psi &gt; 0</span></span>
+<span id="cb28-17"><a href="#cb28-17"></a>  </span>
+<span id="cb28-18"><a href="#cb28-18"></a>  <span class="co"># Initializing the model</span></span>
+<span id="cb28-19"><a href="#cb28-19"></a>  <span class="co"># For the 2nd time step, we assume that we have a simple random walk:</span></span>
+<span id="cb28-20"><a href="#cb28-20"></a>  <span class="co"># z_1 = z_0 + eta</span></span>
+<span id="cb28-21"><a href="#cb28-21"></a>  <span class="co"># We are assuming independence between coordinates</span></span>
+<span id="cb28-22"><a href="#cb28-22"></a>  <span class="co"># Thus using two univariate normals</span></span>
+<span id="cb28-23"><a href="#cb28-23"></a>  <span class="co"># Start with lon, lat</span></span>
+<span id="cb28-24"><a href="#cb28-24"></a>  nll <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">dnorm</span>(z[<span class="dv">2</span>,], <span class="at">mean =</span> z[<span class="dv">1</span>,], <span class="at">sd =</span> <span class="fu">c</span>(sdLon, sdLat), <span class="at">log=</span><span class="cn">TRUE</span>))</span>
+<span id="cb28-25"><a href="#cb28-25"></a>  </span>
+<span id="cb28-26"><a href="#cb28-26"></a>  <span class="co"># nll contribution of the process equation after the 2nd time step</span></span>
+<span id="cb28-27"><a href="#cb28-27"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">3</span><span class="sc">:</span><span class="fu">nrow</span>(z)){</span>
+<span id="cb28-28"><a href="#cb28-28"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">sum</span>(</span>
+<span id="cb28-29"><a href="#cb28-29"></a>      <span class="fu">dnorm</span>(z[i,], </span>
+<span id="cb28-30"><a href="#cb28-30"></a>            <span class="at">mean =</span> z[i<span class="dv">-1</span>,] <span class="sc">+</span> gamma<span class="sc">*</span>(z[i<span class="dv">-1</span>,] <span class="sc">-</span> z[i<span class="dv">-2</span>,]), </span>
+<span id="cb28-31"><a href="#cb28-31"></a>            <span class="at">sd =</span> <span class="fu">c</span>(sdLon, sdLat), </span>
+<span id="cb28-32"><a href="#cb28-32"></a>            <span class="at">log =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb28-33"><a href="#cb28-33"></a>  }</span>
+<span id="cb28-34"><a href="#cb28-34"></a>  </span>
+<span id="cb28-35"><a href="#cb28-35"></a>  <span class="co"># nll contribution of the observation equation</span></span>
+<span id="cb28-36"><a href="#cb28-36"></a>  <span class="co"># The loop here is just the size of the observation vector.</span></span>
+<span id="cb28-37"><a href="#cb28-37"></a>  <span class="co"># We use the time index found in idx to relate</span></span>
+<span id="cb28-38"><a href="#cb28-38"></a>  <span class="co"># the appropriate state to the observation.</span></span>
+<span id="cb28-39"><a href="#cb28-39"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(y)){</span>
+<span id="cb28-40"><a href="#cb28-40"></a>    <span class="co"># We are using the non-standardised t distribution,</span></span>
+<span id="cb28-41"><a href="#cb28-41"></a>    <span class="co"># that is why we are correcting the pdf.</span></span>
+<span id="cb28-42"><a href="#cb28-42"></a>    <span class="co"># Interpolate the value at time of observation</span></span>
+<span id="cb28-43"><a href="#cb28-43"></a>    tmp <span class="ot">&lt;-</span> y[i,] <span class="sc">-</span></span>
+<span id="cb28-44"><a href="#cb28-44"></a>      ((<span class="dv">1</span><span class="sc">-</span>ji[i])<span class="sc">*</span>z[idx[i]<span class="sc">-</span><span class="dv">1</span>,] <span class="sc">+</span></span>
+<span id="cb28-45"><a href="#cb28-45"></a>      ji[i]<span class="sc">*</span>z[idx[i],])</span>
+<span id="cb28-46"><a href="#cb28-46"></a>    </span>
+<span id="cb28-47"><a href="#cb28-47"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">sum</span>(</span>
+<span id="cb28-48"><a href="#cb28-48"></a>      <span class="fu">log</span>(<span class="dv">1</span><span class="sc">/</span>(<span class="fu">c</span>(psiLon, psiLat)<span class="sc">*</span>ac[i,<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>)])) <span class="sc">+</span></span>
+<span id="cb28-49"><a href="#cb28-49"></a>      <span class="fu">dt</span>(tmp<span class="sc">/</span>(<span class="fu">c</span>(psiLon, psiLat)<span class="sc">*</span>ac[i,<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>)]),</span>
+<span id="cb28-50"><a href="#cb28-50"></a>         <span class="at">df =</span> ac[i,<span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">4</span>)],</span>
+<span id="cb28-51"><a href="#cb28-51"></a>         <span class="at">log =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb28-52"><a href="#cb28-52"></a>  }</span>
+<span id="cb28-53"><a href="#cb28-53"></a>    </span>
+<span id="cb28-54"><a href="#cb28-54"></a>  <span class="co"># Report the parameters and their standard errors in their model format</span></span>
+<span id="cb28-55"><a href="#cb28-55"></a>  <span class="fu">ADREPORT</span>(gamma)</span>
+<span id="cb28-56"><a href="#cb28-56"></a>  <span class="fu">ADREPORT</span>(sdLon)</span>
+<span id="cb28-57"><a href="#cb28-57"></a>  <span class="fu">ADREPORT</span>(sdLat)</span>
+<span id="cb28-58"><a href="#cb28-58"></a>  <span class="fu">ADREPORT</span>(psiLon)</span>
+<span id="cb28-59"><a href="#cb28-59"></a>  <span class="fu">ADREPORT</span>(psiLat)</span>
+<span id="cb28-60"><a href="#cb28-60"></a>  </span>
+<span id="cb28-61"><a href="#cb28-61"></a>  <span class="fu">return</span>(nll)</span>
+<span id="cb28-62"><a href="#cb28-62"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="prepare-data-and-set-strating-values-for-parameters" class="level3">
 <h3 class="anchored" data-anchor-id="prepare-data-and-set-strating-values-for-parameters">Prepare data and set strating values for parameters</h3>
 <p>Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by C++. Here we need: 1) the matrix <code>y</code>, which contains the longitude and latitude of the locations; 2) the vector <code>idx</code>, which contains the index that relates the observation at time <span class="math inline">\(i\)</span> to the appropriate state time <span class="math inline">\(t\)</span>; 3) the vector <code>ji</code>, which contains when the observation falls between <span class="math inline">\(t-1\)</span> and <span class="math inline">\(t\)</span>; and 4) the matrix <code>ac</code>, which contains all of the error information for the given location. As a note, we are removing 1 from the index value <code>idx</code> because the index of C++ starts a 0, not 1.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>dataPbTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">y =</span> <span class="fu">cbind</span>(dataPbA<span class="sc">$</span>Lon, dataPbA<span class="sc">$</span>Lat),</span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>               <span class="at">idx=</span>dataPbA<span class="sc">$</span>idx, <span class="at">ji=</span>dataPbA<span class="sc">$</span>ji, <span class="at">ac=</span>dataPbA<span class="sc">$</span>ac)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1"></a>dataPbTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">y =</span> <span class="fu">cbind</span>(dataPbA<span class="sc">$</span>Lon, dataPbA<span class="sc">$</span>Lat),</span>
+<span id="cb29-2"><a href="#cb29-2"></a>               <span class="at">idx=</span>dataPbA<span class="sc">$</span>idx, <span class="at">ji=</span>dataPbA<span class="sc">$</span>ji, <span class="at">ac=</span>dataPbA<span class="sc">$</span>ac)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We then need to create a list with the starting values for the parameters, including the states. To help the optimization, we will set the initial value of the states to be the values of the observed Argos location. This will just start the optimization at the good relative magnitude. We could have alternatively, scaled the model so to have transformed longitude and latitude values that are centered at 0.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Setting the initial values for the state.</span></span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="co"># We use the 1st obs. location to start the optimization</span></span>
-<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="co"># at a relatively good place</span></span>
-<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>zinitPbTmb <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">as.numeric</span>(dataPbA[<span class="dv">1</span>,<span class="fu">c</span>(<span class="st">"Lon"</span>,<span class="st">"Lat"</span>)]), </span>
-<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>                     <span class="fu">max</span>(dataPbA<span class="sc">$</span>idx), <span class="dv">2</span>, <span class="at">byrow=</span><span class="cn">TRUE</span>)</span>
-<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Creating a list of initial values for the parameters</span></span>
-<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>parPbTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">logitGamma=</span><span class="dv">0</span>,</span>
-<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>               <span class="at">logSdLon=</span><span class="dv">0</span>, <span class="at">logSdLat=</span><span class="dv">0</span>, <span class="at">logPsiLon=</span><span class="dv">0</span>, <span class="at">logPsiLat=</span><span class="dv">0</span>,</span>
-<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>               <span class="at">z=</span>zinitPbTmb)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1"></a><span class="co"># Setting the initial values for the state.</span></span>
+<span id="cb30-2"><a href="#cb30-2"></a><span class="co"># We use the 1st obs. location to start the optimization</span></span>
+<span id="cb30-3"><a href="#cb30-3"></a><span class="co"># at a relatively good place</span></span>
+<span id="cb30-4"><a href="#cb30-4"></a>zinitPbTmb <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">as.numeric</span>(dataPbA[<span class="dv">1</span>,<span class="fu">c</span>(<span class="st">"Lon"</span>,<span class="st">"Lat"</span>)]), </span>
+<span id="cb30-5"><a href="#cb30-5"></a>                     <span class="fu">max</span>(dataPbA<span class="sc">$</span>idx), <span class="dv">2</span>, <span class="at">byrow=</span><span class="cn">TRUE</span>)</span>
+<span id="cb30-6"><a href="#cb30-6"></a><span class="co"># Creating a list of initial values for the parameters</span></span>
+<span id="cb30-7"><a href="#cb30-7"></a>parPbTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">logitGamma=</span><span class="dv">0</span>,</span>
+<span id="cb30-8"><a href="#cb30-8"></a>               <span class="at">logSdLon=</span><span class="dv">0</span>, <span class="at">logSdLat=</span><span class="dv">0</span>, <span class="at">logPsiLon=</span><span class="dv">0</span>, <span class="at">logPsiLat=</span><span class="dv">0</span>,</span>
+<span id="cb30-9"><a href="#cb30-9"></a>               <span class="at">z=</span>zinitPbTmb)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="fitting-the-state-space-model-to-data" class="level3">
 <h3 class="anchored" data-anchor-id="fitting-the-state-space-model-to-data">Fitting the state-space model to data</h3>
 <p>We have now all of the pieces needed to create the object with <code>MakeADFun</code>, which will allow us to minimize the negative log likelihood. Note that for more complex model, it sometimes help to allow for more iterations in the inner maximization. This can slow down the process, but here if we use the default maximum number of inner iterations, we will get the error. Thus, we increase the number of inner iterations to 5000 using <code>inner.control</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>mPbTmb <span class="ot">&lt;-</span> <span class="fu">MakeADFun</span>(dcrw, <span class="at">parameters =</span> parPbTmb, </span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>                    <span class="at">random =</span> <span class="st">"z"</span>,</span>
-<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>                    <span class="at">inner.control =</span> <span class="fu">list</span>(<span class="at">maxit=</span><span class="dv">5000</span>),</span>
-<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>                    <span class="at">silent =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1"></a>mPbTmb <span class="ot">&lt;-</span> <span class="fu">MakeADFun</span>(dcrw, <span class="at">parameters =</span> parPbTmb, </span>
+<span id="cb31-2"><a href="#cb31-2"></a>                    <span class="at">random =</span> <span class="st">"z"</span>,</span>
+<span id="cb31-3"><a href="#cb31-3"></a>                    <span class="at">inner.control =</span> <span class="fu">list</span>(<span class="at">maxit=</span><span class="dv">5000</span>),</span>
+<span id="cb31-4"><a href="#cb31-4"></a>                    <span class="at">silent =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Using the created object, we can find the MLE with <code>nlminb</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>fPbTmb <span class="ot">&lt;-</span> <span class="fu">nlminb</span>(mPbTmb<span class="sc">$</span>par, mPbTmb<span class="sc">$</span>fn, mPbTmb<span class="sc">$</span>gr)</span>
-<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>fPbTmb<span class="sc">$</span>message</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1"></a>fPbTmb <span class="ot">&lt;-</span> <span class="fu">nlminb</span>(mPbTmb<span class="sc">$</span>par, mPbTmb<span class="sc">$</span>fn, mPbTmb<span class="sc">$</span>gr)</span>
+<span id="cb32-2"><a href="#cb32-2"></a>fPbTmb<span class="sc">$</span>message</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] "relative convergence (4)"</code></pre>
 </div>
 </div>
 <p>Looks like it converged, so let us now look at the estimated parameters using <code>sdreport</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>parestPbTmb <span class="ot">&lt;-</span> <span class="fu">summary</span>(<span class="fu">sdreport</span>(mPbTmb))</span>
-<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>parestPbTmb[<span class="fu">c</span>(<span class="st">"gamma"</span>, <span class="st">"sdLon"</span>, <span class="st">"sdLat"</span>, <span class="st">"psiLon"</span>, <span class="st">"psiLat"</span>),]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1"></a>parestPbTmb <span class="ot">&lt;-</span> <span class="fu">summary</span>(<span class="fu">sdreport</span>(mPbTmb))</span>
+<span id="cb34-2"><a href="#cb34-2"></a>parestPbTmb[<span class="fu">c</span>(<span class="st">"gamma"</span>, <span class="st">"sdLon"</span>, <span class="st">"sdLat"</span>, <span class="st">"psiLon"</span>, <span class="st">"psiLat"</span>),]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>         Estimate  Std. Error
 gamma  0.47475208 0.036142278
@@ -624,26 +625,26 @@ psiLat 1.89293815 0.053486332</code></pre>
 <p>So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., <span class="math inline">\(\gamma =\)</span> . Interestingly, the process variation is quite different in the latitude and longitude direction. This could be due to the fact that one degree of latitude and one degree of longitude are not necessarily covering equivalent distance. We see also that the correction factors for the longitude and latitude are quite different from one another and might point to the advantage of estimating one for each coordinate.</p>
 <p>Now let us look at the state estimates. To extract the state value itself, we use <code>$env$parList()</code>. To extract the standard error, we use the matrix returned by <code>summary(sdreport())</code> above.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get the point value</span></span>
-<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>zsPbTmb <span class="ot">&lt;-</span> mPbTmb<span class="sc">$</span>env<span class="sc">$</span><span class="fu">parList</span>()<span class="sc">$</span>z</span>
-<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Get the standard errors</span></span>
-<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>zsvPbTmb <span class="ot">&lt;-</span> parestPbTmb[<span class="fu">rownames</span>(parestPbTmb)<span class="sc">%in%</span><span class="st">"z"</span>,]</span>
-<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>zsvPbTmb <span class="ot">&lt;-</span> <span class="fu">cbind</span>(zsvPbTmb[<span class="dv">1</span><span class="sc">:</span>(<span class="fu">nrow</span>(zsvPbTmb)<span class="sc">/</span><span class="dv">2</span>),<span class="dv">2</span>], </span>
-<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>                  zsvPbTmb[(<span class="dv">1</span><span class="sc">+</span><span class="fu">nrow</span>(zsvPbTmb)<span class="sc">/</span><span class="dv">2</span>)<span class="sc">:</span><span class="fu">nrow</span>(zsvPbTmb),<span class="dv">2</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1"></a><span class="co"># Get the point value</span></span>
+<span id="cb36-2"><a href="#cb36-2"></a>zsPbTmb <span class="ot">&lt;-</span> mPbTmb<span class="sc">$</span>env<span class="sc">$</span><span class="fu">parList</span>()<span class="sc">$</span>z</span>
+<span id="cb36-3"><a href="#cb36-3"></a><span class="co"># Get the standard errors</span></span>
+<span id="cb36-4"><a href="#cb36-4"></a>zsvPbTmb <span class="ot">&lt;-</span> parestPbTmb[<span class="fu">rownames</span>(parestPbTmb)<span class="sc">%in%</span><span class="st">"z"</span>,]</span>
+<span id="cb36-5"><a href="#cb36-5"></a>zsvPbTmb <span class="ot">&lt;-</span> <span class="fu">cbind</span>(zsvPbTmb[<span class="dv">1</span><span class="sc">:</span>(<span class="fu">nrow</span>(zsvPbTmb)<span class="sc">/</span><span class="dv">2</span>),<span class="dv">2</span>], </span>
+<span id="cb36-6"><a href="#cb36-6"></a>                  zsvPbTmb[(<span class="dv">1</span><span class="sc">+</span><span class="fu">nrow</span>(zsvPbTmb)<span class="sc">/</span><span class="dv">2</span>)<span class="sc">:</span><span class="fu">nrow</span>(zsvPbTmb),<span class="dv">2</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let’s plot the results.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(zsPbTmb, </span>
-<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">pch=</span><span class="dv">19</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">las=</span><span class="dv">1</span>,</span>
-<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab=</span><span class="st">"Longitude"</span>, <span class="at">ylab=</span><span class="st">"Latitude"</span>)</span>
-<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(dataPbA[,<span class="fu">c</span>(<span class="st">"Lon"</span>, <span class="st">"Lat"</span>)], </span>
-<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty=</span><span class="dv">3</span>)</span>
-<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a><span class="fu">legend</span>(<span class="st">"top"</span>,</span>
-<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Sim. Obs."</span>, <span class="st">"Estimated latent states"</span>),</span>
-<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">19</span>),</span>
-<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"blue"</span>, <span class="st">"red"</span>),</span>
-<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>       <span class="at">lty =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">1</span>),</span>
-<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">horiz=</span><span class="cn">TRUE</span>, <span class="at">bty=</span><span class="st">"n"</span>, <span class="at">cex=</span><span class="fl">0.9</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1"></a><span class="fu">plot</span>(zsPbTmb, </span>
+<span id="cb37-2"><a href="#cb37-2"></a>     <span class="at">pch=</span><span class="dv">19</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">las=</span><span class="dv">1</span>,</span>
+<span id="cb37-3"><a href="#cb37-3"></a>     <span class="at">xlab=</span><span class="st">"Longitude"</span>, <span class="at">ylab=</span><span class="st">"Latitude"</span>)</span>
+<span id="cb37-4"><a href="#cb37-4"></a><span class="fu">points</span>(dataPbA[,<span class="fu">c</span>(<span class="st">"Lon"</span>, <span class="st">"Lat"</span>)], </span>
+<span id="cb37-5"><a href="#cb37-5"></a>       <span class="at">pch=</span><span class="dv">3</span>, <span class="at">cex=</span><span class="fl">0.7</span>, <span class="at">col =</span> <span class="st">"blue"</span>, <span class="at">ty=</span><span class="st">"o"</span>, <span class="at">lty=</span><span class="dv">3</span>)</span>
+<span id="cb37-6"><a href="#cb37-6"></a><span class="fu">legend</span>(<span class="st">"top"</span>,</span>
+<span id="cb37-7"><a href="#cb37-7"></a>       <span class="at">legend =</span> <span class="fu">c</span>(<span class="st">"Sim. Obs."</span>, <span class="st">"Estimated latent states"</span>),</span>
+<span id="cb37-8"><a href="#cb37-8"></a>       <span class="at">pch =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">19</span>),</span>
+<span id="cb37-9"><a href="#cb37-9"></a>       <span class="at">col =</span> <span class="fu">c</span>(<span class="st">"blue"</span>, <span class="st">"red"</span>),</span>
+<span id="cb37-10"><a href="#cb37-10"></a>       <span class="at">lty =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">1</span>),</span>
+<span id="cb37-11"><a href="#cb37-11"></a>       <span class="at">horiz=</span><span class="cn">TRUE</span>, <span class="at">bty=</span><span class="st">"n"</span>, <span class="at">cex=</span><span class="fl">0.9</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
