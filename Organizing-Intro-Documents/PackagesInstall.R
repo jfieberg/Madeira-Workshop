@@ -36,7 +36,13 @@ if (!all(pkg.required %in% pkg.available)) {
 
 # install 'develop' version of momentuHMM
 install.packages("momentuHMM", repos = "https://bmcclintock.r-universe.dev", dependencies = TRUE)
+install.packages("aniMotum",
+                 repos = c("https://cloud.r-project.org",
+                 "https://ianjonsen.r-universe.dev"),
+                 dependencies = TRUE)
 remotes::install_github("ecoisilva/movedesign")
+
+
 
 pkg.required <- append(pkg.required, c("momentuHMM", "movedesign"))
 
