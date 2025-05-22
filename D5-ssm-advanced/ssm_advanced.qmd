@@ -227,7 +227,8 @@ To identify our random effects, namely the states, $z_t$, we set the argument `r
 m2pTmb <- RTMB::MakeADFun(toy2p, 
                     parameters = par2pTmb, 
                     map = mapTmb, 
-                    random = "z")
+                    random = "z",
+                    silent = TRUE)
 
 ```
 
@@ -307,56 +308,8 @@ legend("top",
        horiz=TRUE, bty="n", cex=0.9)
 ```
 
-## Gentoo movement data
-
-We will analyze a dataset containing movement tracks of three gentoo penguins tagged with Argos tags. The dataset belongs to Dr. Marie Auger-Méthé (University of British Columbia) and Dr. Glenn Crossin (Dalhousie University). They provided the data only for this tutorial, please do not use for other purposes without their consent. Contact: auger-methe\@stat.ubc.ca.
-
-This is the same data as the data we explored on the first day. See the first day tutorial for more information on the time intervals.
-
-Let's load the data. Here, I'm assuming you have the Madeira-Workshop as working directory.
-
-```{r load_gentoo, attr.source = ".numberLines"}
-gentoo_tracks <- read.csv(
-  here("D1-data-prep-ssm", "data", "tracks_argos_gentoo.csv")) %>%
-  mutate(ID = factor(ID),
-         datetime = ymd_hms(datetime))
-  
-head(gentoo_tracks)
-```
-
-The columns/variables are: - `ID`: Individual identifier - `datetime`: time of location - `Longitude`: longitude - `Latitude`: latitude - `Qual`: Argos location quality, one of 0, 1, 2, 3, A, B
-
-There is often duplicates and records (rows) with missing data. We want to remove any row that is missing latitude or longitude or location quality and duplicates.
-
-```{r clean_gentoo, attr.source = ".numberLines"}
-gentoo_tracks <- gentoo_tracks %>% 
-  filter(!is.na(Longitude) & !is.na(Latitude) & Qual != "",
-         # remove identical records
-         !(datetime == lag(datetime) & 
-             Longitude == lag(Longitude) & 
-             Latitude == lag(Latitude) & 
-             Qual == lag(Qual)))
-```
-
-Here, the data are already sorted in order of ID and datetime, but this is not always the case. It's a good habit to sort them appropriately.
-
-```{r order_gentoo, attr.source = ".numberLines"}
-gentoo_tracks <- gentoo_tracks %>% arrange(ID, datetime)
-```
-
-Let's plot the data. Here, the coordinate system is WGS83 (i.e., regular lat/lon), so we use `crs = 4326`.
-
-```{r plot_raw_gentoo, attr.source = ".numberLines", warning=FALSE}
-ggplot() +
-  geom_spatial_path(data =  gentoo_tracks, 
-                    aes(x = Longitude, y = Latitude, color = ID), 
-                    crs = 4326)
-```
-
-Here we are going to fit a state-space model similar to the one used in `aniMotum`. We are going to follow the general set up of the supplementary material associated with the Auger-Méthé et al. 2021 paper. However, here we are going to use `RTMB` rather than `TMB`.
 
 # Fitting a movement state-space model with `RTMB`.
-
 
 # State-space model from Argos movement data: a polar bear example
 
@@ -617,15 +570,20 @@ pbRes <- RTMB::oneStepPredict(mPbTmb,
                         discrete=FALSE, trace=FALSE)
 head(pbRes, 30)
 tail(pbRes, 30)
+
+plot(observation ~ mean, data=pbRes)
+plot(observation ~ residual, data=pbRes)
+plot(residual, data=pbRes)
+pbRes <- pbRes %>% mutate(res = observation - mean)
 ```
 
 We will separate the residuals for the longitude and latitude. The residuals will be ordered in the same way as `pbKeepInd`, and the first two residuals are not well defined for this model.
 
 ```{r pbTmbosasep, tidy=FALSE, cache=TRUE}
 pbResLon <- pbRes[seq(3, nrow(pbRes)/2),
-                  "residual"]
+                  "res"]
 pbResLat <- pbRes[seq(nrow(pbRes)/2 + 3, nrow(pbRes)),
-                  "residual"]
+                  "res"]
 ```
 
 Now let us visually assess the residuals.
