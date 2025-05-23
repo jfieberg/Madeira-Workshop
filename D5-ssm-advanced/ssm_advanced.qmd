@@ -144,6 +144,7 @@ Now, let us create the negative log-likelihood function that we will minimize (e
 ```{r toy2p, attr.source = ".numberLines", tidy=FALSE}
 # Define main function
 toy2p <- function(parms, data){
+  # Allow to access items from these objects directly 
   getAll(dataTmb, parms, warn=FALSE)
   ## Optional (enables extra RTMB features)
   # Tells RTMB that it's the response
@@ -197,17 +198,17 @@ toy2p <- function(parms, data){
 
 ### Preparing the model for fitting
 
-First, we need to prepare the data. This is going to be a list with all the items found in the .cpp files that are of the type `DATA` (e.g., `DATA_VECTOR`). Here, we only have `y` which is the time series of observed values.
+First, we need to prepare the data. This is going to be a list with all the data items needed in the function. It needs to have the same name as the one we defined in the function, here `dataTmb`. Here, we only have `y` which is the time series of observed values.
 
 ```{r prepY, attr.source = ".numberLines"}
 dataTmb <- data.frame(y = y)
 ```
 
-Second, we need a list with the parameters. Again the names need to match those in the .cpp file. These are the starting values for the parameters. Note that this includes both the parameters and the states.
+Second, we need a list with the parameters. Again the names need to match those in the function. These are the starting values for the parameters. Note that this includes both the parameters and the states.
 
 ```{r parPrep, attr.source = ".numberLines", tidy=FALSE}
 par2pTmb <- list(logSdP = 0, logSdO = 0,
-             z=rep(0, length(dataTmb$y)+1))
+             z = rep(0, length(dataTmb$y)+1))
 ```
 
 By default all values of `par2pTmb` will be estimated, but we assume that we know the value of the state at time 0, $z_0 = 0$. To provide this information, we can create a named list that we will input for the argument `map` of the function `MakeADFun` below. The elements of `map` should have the same name and size as those in `par2pTmb`, but we only need to specify the elements that we want to manipulate, here `par2pTmb$z`. To fix a value, we set that value to `NA`. The values that are estimated should have a different entry and all values should be factors.
@@ -216,10 +217,9 @@ By default all values of `par2pTmb` will be estimated, but we assume that we kno
 mapTmb <- list(z=as.factor(c(NA,1:length(dataTmb$y))))
 ```
 
-Before we can fit the model, we need to use the function `MakeADFun` to combine the data, the parameters, and the model and create a function that calculates the negative
-log likelihood and the gradients. 
+Before we can fit the model, we need to use the function `MakeADFun` to combine the data, the parameters, and the model and create a function that calculates the negative log likelihood and the gradients. 
 
-To identify our random effects, namely the states, $z_t$, we set the argument `random` to equal the name of the parameters that are random effects. The argument `DLL` identify the compiled C++ function to be linked.
+To identify our random effects, namely the states, $z_t$, we set the argument `random` to equal the name of the parameters that are random effects.
 
 ```{r MakeADFun, attr.source = ".numberLines", tidy=FALSE}
 m2pTmb <- RTMB::MakeADFun(toy2p, 
@@ -256,8 +256,8 @@ To look at the parameter estimates, you can use the function `sdreport` and obje
 sdr2pTmb <- summary(sdreport(m2pTmb))
 # This will have the parameters and states
 # So we can just print the parameters
-cbind("Simulated" = c(sdp, sdo),
-  sdr2pTmb[c("sdp", "sdo"),])
+round(cbind("Simulated" = c(sdp, sdo),
+  sdr2pTmb[c("sdp", "sdo"),]),3)
 ```
 
 We can see that the estimates for both the process variation and the observation error are close to their true value of 0.1, with relatively small standard errors (SEs).
@@ -362,7 +362,7 @@ dataPbA$ji <- as.numeric(24-difftime(allDays[dataPbA$idx],
 #                                  dataPbA$Time, units="hours"))/24
 ```
 
-It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package `bsam` (Jonsen et al. 2005). We have done a few changes to the values used in `bsam`. In particular, the skewness of the t-distribution is undefined when the degree of freedom is $\leq 3$. We have thus set any degree of freedom values smaller or equal to 3 to 3.00001.
+It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package `bsam` (Jonsen et al. 2005). We have done a few changes to the values used in `bsam`. In particular, the skewness of the t-distribution is undefined when the degrees of freedom are $\leq 3$. We have thus set any degrees of freedom values smaller or equal to 3 to 3.00001.
 
 ```{r Argos.error, attr.source = ".numberLines", tidy=FALSE}
 ArgosC <- matrix(nrow=6, ncol=4)
@@ -387,15 +387,15 @@ dataPbA$ac <- ArgosC[as.character(dataPbA$QualClass),]
 
 ## Fitting the model and checking model fit
 
-### Create the C++ code defining the negative log-likelihood
+### Create the function defining the negative log-likelihood
 
-Again, the first thing we need to do to be able to fit the model in `TMB` is to create a file that will contain the C++ code to evaluate the negative log-likelihood value of the model. We will name the file **dcrw.cpp**.
+Again, the first thing we need to do to be able to fit the model in `RTMB` is to create the function that evaluates the negative log-likelihood value of the model.
 
 ```{r dcrw_nll, attr.source = ".numberLines", tidy=FALSE}
 dcrw <- function(parms){
   # Make items within dataPbTmb and parms easily available
   getAll(dataPbTmb, parms, warn=FALSE)
-  # Tell TMB y is the response variable
+  # Tell RTMB y is the response variable
   y <- OBS(y)
   
   # Transformation of the input parameters to model format
@@ -461,7 +461,7 @@ dcrw <- function(parms){
 
 ### Prepare data and set strating values for parameters
 
-Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by C++. Here we need: 1) the matrix `y`, which contains the longitude and latitude of the locations; 2) the vector `idx`, which contains the index that relates the observation at time $i$ to the appropriate state time $t$; 3) the vector `ji`, which contains when the observation falls between $t-1$ and $t$; and 4) the matrix `ac`, which contains all of the error information for the given location. As a note, we are removing 1 from the index value `idx` because the index of C++ starts a 0, not 1.
+Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by the functions. Here we need: 1) the matrix `y`, which contains the longitude and latitude of the locations; 2) the vector `idx`, which contains the index that relates the observation at time $i$ to the appropriate state time $t$; 3) the vector `ji`, which contains when the observation falls between $t-1$ and $t$; and 4) the matrix `ac`, which contains all of the error information for the given location.
 
 ```{r polar.bear.prep, attr.source = ".numberLines", tidy=FALSE}
 dataPbTmb <- list(y = cbind(dataPbA$Lon, dataPbA$Lat),
@@ -507,7 +507,7 @@ parestPbTmb <- summary(sdreport(mPbTmb))
 parestPbTmb[c("gamma", "sdLon", "sdLat", "psiLon", "psiLat"),]
 ```
 
-So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., $\gamma =$ \Sexpr{round(parestPbTmb["gamma",1],3)}.
+So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., $\gamma =$ `r round(parestPbTmb["gamma",1],3)`.
 Interestingly, the process variation is quite different in the latitude and longitude direction.
 This could be due to the fact that one degree of latitude and one degree of longitude are not necessarily covering equivalent distance.
 We see also that the correction factors for the longitude and latitude are quite different from one another and might point to the advantage of estimating one for each coordinate.

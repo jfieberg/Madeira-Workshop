@@ -242,84 +242,84 @@ pre.numberSource code
 </div>
 <p>With real data, we usually only have the observations, <span class="math inline">\(y_t\)</span>, and do not know the true states, <span class="math inline">\(z_t\)</span>. However, simulated data allow us to see the discrepancies between the observed values and the values for the process they represent.</p>
 </section>
-<section id="fitting-the-model-using-tmb" class="level2">
-<h2 class="anchored" data-anchor-id="fitting-the-model-using-tmb">Fitting the model using TMB</h2>
-<p>In TMB you need to create a C++ file that computes the value of the negative log likelihood for your data and for a given set of parameter values. Then, you compile the C++ code using <code>TMB</code> and use that function in one of R’s optimizers to find the minimum negative log likelihood. The beauty of <code>TMB</code> is that it uses the Laplace approximation to integrate over the states and computes the gradient efficiently, which speeds up the optimizing process.</p>
-<section id="writing-the-negative-log-likelihood-function-in-c" class="level3">
-<h3 class="anchored" data-anchor-id="writing-the-negative-log-likelihood-function-in-c">Writing the negative log-likelihood function in C++</h3>
-<p>Now, let us create the negative log-likelihood function that we will minimize (equivalent of maximizing the likelihood). We write this function in a special TMB C++ language. The code for the function needs to be saved in a text file. We usually give it the extension .cpp. You can do this directly in R Studio. You write the code just as you would write a separate R script, but you save it as a C++ file by giving it the .cpp extension.</p>
-<p>We name the file <strong>toy2p.cpp</strong> and it will contain the following code. Note that in C++, comments are preceded by // or contained within /* */. Also, as explained below, here the code is a little bit more complex than strictly necessary. We have included code that allow us to compute the one-step-ahead residuals and simulate from the model. While these features are not always necessary, they are key to model checking and thus we believe they should be part of all model fitting workflow.</p>
+<section id="fitting-the-model-using-rtmb" class="level2">
+<h2 class="anchored" data-anchor-id="fitting-the-model-using-rtmb">Fitting the model using <code>RTMB</code></h2>
+<p>In <code>RTMB</code> you need to create a function that computes the value of the negative log likelihood value for a given set of parameter values. Then, you use that function in one of R’s optimizers to find the minimum negative log likelihood. The beauty of <code>TMB</code> is that it uses the Laplace approximation to integrate over the states and computes the gradient efficiently, which speeds up the optimizing process.</p>
+<section id="writing-the-negative-log-likelihood-function" class="level3">
+<h3 class="anchored" data-anchor-id="writing-the-negative-log-likelihood-function">Writing the negative log-likelihood function</h3>
+<p>Now, let us create the negative log-likelihood function that we will minimize (equivalent of maximizing the likelihood).</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1"></a><span class="co"># Define main function</span></span>
 <span id="cb6-2"><a href="#cb6-2"></a>toy2p <span class="ot">&lt;-</span> <span class="cf">function</span>(parms, data){</span>
-<span id="cb6-3"><a href="#cb6-3"></a>  <span class="fu">getAll</span>(dataTmb, parms, <span class="at">warn=</span><span class="cn">FALSE</span>)</span>
-<span id="cb6-4"><a href="#cb6-4"></a>  <span class="do">## Optional (enables extra RTMB features)</span></span>
-<span id="cb6-5"><a href="#cb6-5"></a>  <span class="co"># Tells RTMB that it's the response</span></span>
-<span id="cb6-6"><a href="#cb6-6"></a>  y <span class="ot">&lt;-</span> <span class="fu">OBS</span>(y)</span>
-<span id="cb6-7"><a href="#cb6-7"></a></span>
-<span id="cb6-8"><a href="#cb6-8"></a>  <span class="co"># Specify the parameters transformation</span></span>
-<span id="cb6-9"><a href="#cb6-9"></a>  <span class="co"># Transform standard deviations</span></span>
-<span id="cb6-10"><a href="#cb6-10"></a>  <span class="co"># exp(par) is a trick to make sure that the estimated sd &gt; 0</span></span>
-<span id="cb6-11"><a href="#cb6-11"></a>  sdp <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdP)</span>
-<span id="cb6-12"><a href="#cb6-12"></a>  sdo <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdO)</span>
-<span id="cb6-13"><a href="#cb6-13"></a>  </span>
-<span id="cb6-14"><a href="#cb6-14"></a>  <span class="do">## Initialize joint negative log likelihood</span></span>
-<span id="cb6-15"><a href="#cb6-15"></a>  nll <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
-<span id="cb6-16"><a href="#cb6-16"></a></span>
-<span id="cb6-17"><a href="#cb6-17"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
-<span id="cb6-18"><a href="#cb6-18"></a>  <span class="co"># of the process equation for t=1,...,T</span></span>
-<span id="cb6-19"><a href="#cb6-19"></a>  <span class="co"># Remember that we fixed z_0 = 0</span></span>
-<span id="cb6-20"><a href="#cb6-20"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">2</span><span class="sc">:</span><span class="fu">length</span>(z)){</span>
-<span id="cb6-21"><a href="#cb6-21"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(z[i], <span class="at">mean=</span>z[i<span class="dv">-1</span>], <span class="at">sd=</span>sdp, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
-<span id="cb6-22"><a href="#cb6-22"></a>  }</span>
-<span id="cb6-23"><a href="#cb6-23"></a>  </span>
+<span id="cb6-3"><a href="#cb6-3"></a>  <span class="co"># Allow to access items from these objects directly </span></span>
+<span id="cb6-4"><a href="#cb6-4"></a>  <span class="fu">getAll</span>(dataTmb, parms, <span class="at">warn=</span><span class="cn">FALSE</span>)</span>
+<span id="cb6-5"><a href="#cb6-5"></a>  <span class="do">## Optional (enables extra RTMB features)</span></span>
+<span id="cb6-6"><a href="#cb6-6"></a>  <span class="co"># Tells RTMB that it's the response</span></span>
+<span id="cb6-7"><a href="#cb6-7"></a>  y <span class="ot">&lt;-</span> <span class="fu">OBS</span>(y)</span>
+<span id="cb6-8"><a href="#cb6-8"></a></span>
+<span id="cb6-9"><a href="#cb6-9"></a>  <span class="co"># Specify the parameters transformation</span></span>
+<span id="cb6-10"><a href="#cb6-10"></a>  <span class="co"># Transform standard deviations</span></span>
+<span id="cb6-11"><a href="#cb6-11"></a>  <span class="co"># exp(par) is a trick to make sure that the estimated sd &gt; 0</span></span>
+<span id="cb6-12"><a href="#cb6-12"></a>  sdp <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdP)</span>
+<span id="cb6-13"><a href="#cb6-13"></a>  sdo <span class="ot">&lt;-</span> <span class="fu">exp</span>(logSdO)</span>
+<span id="cb6-14"><a href="#cb6-14"></a>  </span>
+<span id="cb6-15"><a href="#cb6-15"></a>  <span class="do">## Initialize joint negative log likelihood</span></span>
+<span id="cb6-16"><a href="#cb6-16"></a>  nll <span class="ot">&lt;-</span> <span class="fl">0.0</span></span>
+<span id="cb6-17"><a href="#cb6-17"></a></span>
+<span id="cb6-18"><a href="#cb6-18"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
+<span id="cb6-19"><a href="#cb6-19"></a>  <span class="co"># of the process equation for t=1,...,T</span></span>
+<span id="cb6-20"><a href="#cb6-20"></a>  <span class="co"># Remember that we fixed z_0 = 0</span></span>
+<span id="cb6-21"><a href="#cb6-21"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">2</span><span class="sc">:</span><span class="fu">length</span>(z)){</span>
+<span id="cb6-22"><a href="#cb6-22"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(z[i], <span class="at">mean=</span>z[i<span class="dv">-1</span>], <span class="at">sd=</span>sdp, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
+<span id="cb6-23"><a href="#cb6-23"></a>  }</span>
 <span id="cb6-24"><a href="#cb6-24"></a>  </span>
-<span id="cb6-25"><a href="#cb6-25"></a>   </span>
-<span id="cb6-26"><a href="#cb6-26"></a>  </span>
-<span id="cb6-27"><a href="#cb6-27"></a></span>
-<span id="cb6-28"><a href="#cb6-28"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
-<span id="cb6-29"><a href="#cb6-29"></a>  <span class="co"># of the observation equation for t=1,...,T</span></span>
-<span id="cb6-30"><a href="#cb6-30"></a>  <span class="co"># Remember, the first element of z is at t=0,</span></span>
-<span id="cb6-31"><a href="#cb6-31"></a>  <span class="co"># while the first element of y is at t=1</span></span>
-<span id="cb6-32"><a href="#cb6-32"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(y)){</span>
-<span id="cb6-33"><a href="#cb6-33"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(y[i], <span class="at">mean=</span>z[i<span class="sc">+</span><span class="dv">1</span>], <span class="at">sd=</span>sdo, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
-<span id="cb6-34"><a href="#cb6-34"></a>  }</span>
-<span id="cb6-35"><a href="#cb6-35"></a>  </span>
-<span id="cb6-36"><a href="#cb6-36"></a>   </span>
-<span id="cb6-37"><a href="#cb6-37"></a>    </span>
-<span id="cb6-38"><a href="#cb6-38"></a>  <span class="co"># State the transformed parameters to report</span></span>
-<span id="cb6-39"><a href="#cb6-39"></a>  <span class="co"># Using ADREPORT will return the point values and the standard errors</span></span>
-<span id="cb6-40"><a href="#cb6-40"></a>  <span class="co"># Note that we only need to specify this for parameters</span></span>
-<span id="cb6-41"><a href="#cb6-41"></a>  <span class="co"># we transformed, see section D above</span></span>
-<span id="cb6-42"><a href="#cb6-42"></a>  <span class="co"># The other parameters, including the random effects (states),</span></span>
-<span id="cb6-43"><a href="#cb6-43"></a>  <span class="co"># will be returned automatically</span></span>
-<span id="cb6-44"><a href="#cb6-44"></a>  <span class="fu">ADREPORT</span>(sdp)</span>
-<span id="cb6-45"><a href="#cb6-45"></a>  <span class="fu">ADREPORT</span>(sdo)</span>
-<span id="cb6-46"><a href="#cb6-46"></a></span>
-<span id="cb6-47"><a href="#cb6-47"></a>   <span class="co">#State that we want the negative log-likelihood to be returned</span></span>
-<span id="cb6-48"><a href="#cb6-48"></a>  <span class="co">#This is what the optimizer in R will minimize</span></span>
-<span id="cb6-49"><a href="#cb6-49"></a>  <span class="fu">return</span>(nll)</span>
-<span id="cb6-50"><a href="#cb6-50"></a>  </span>
-<span id="cb6-51"><a href="#cb6-51"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-25"><a href="#cb6-25"></a>  </span>
+<span id="cb6-26"><a href="#cb6-26"></a>   </span>
+<span id="cb6-27"><a href="#cb6-27"></a>  </span>
+<span id="cb6-28"><a href="#cb6-28"></a></span>
+<span id="cb6-29"><a href="#cb6-29"></a>  <span class="co"># Calculate the contribution to the negative log-likelihood</span></span>
+<span id="cb6-30"><a href="#cb6-30"></a>  <span class="co"># of the observation equation for t=1,...,T</span></span>
+<span id="cb6-31"><a href="#cb6-31"></a>  <span class="co"># Remember, the first element of z is at t=0,</span></span>
+<span id="cb6-32"><a href="#cb6-32"></a>  <span class="co"># while the first element of y is at t=1</span></span>
+<span id="cb6-33"><a href="#cb6-33"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(y)){</span>
+<span id="cb6-34"><a href="#cb6-34"></a>    nll <span class="ot">&lt;-</span> nll <span class="sc">-</span> <span class="fu">dnorm</span>(y[i], <span class="at">mean=</span>z[i<span class="sc">+</span><span class="dv">1</span>], <span class="at">sd=</span>sdo, <span class="at">log=</span><span class="cn">TRUE</span>)</span>
+<span id="cb6-35"><a href="#cb6-35"></a>  }</span>
+<span id="cb6-36"><a href="#cb6-36"></a>  </span>
+<span id="cb6-37"><a href="#cb6-37"></a>   </span>
+<span id="cb6-38"><a href="#cb6-38"></a>    </span>
+<span id="cb6-39"><a href="#cb6-39"></a>  <span class="co"># State the transformed parameters to report</span></span>
+<span id="cb6-40"><a href="#cb6-40"></a>  <span class="co"># Using ADREPORT will return the point values and the standard errors</span></span>
+<span id="cb6-41"><a href="#cb6-41"></a>  <span class="co"># Note that we only need to specify this for parameters</span></span>
+<span id="cb6-42"><a href="#cb6-42"></a>  <span class="co"># we transformed, see section D above</span></span>
+<span id="cb6-43"><a href="#cb6-43"></a>  <span class="co"># The other parameters, including the random effects (states),</span></span>
+<span id="cb6-44"><a href="#cb6-44"></a>  <span class="co"># will be returned automatically</span></span>
+<span id="cb6-45"><a href="#cb6-45"></a>  <span class="fu">ADREPORT</span>(sdp)</span>
+<span id="cb6-46"><a href="#cb6-46"></a>  <span class="fu">ADREPORT</span>(sdo)</span>
+<span id="cb6-47"><a href="#cb6-47"></a></span>
+<span id="cb6-48"><a href="#cb6-48"></a>   <span class="co">#State that we want the negative log-likelihood to be returned</span></span>
+<span id="cb6-49"><a href="#cb6-49"></a>  <span class="co">#This is what the optimizer in R will minimize</span></span>
+<span id="cb6-50"><a href="#cb6-50"></a>  <span class="fu">return</span>(nll)</span>
+<span id="cb6-51"><a href="#cb6-51"></a>  </span>
+<span id="cb6-52"><a href="#cb6-52"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="preparing-the-model-for-fitting" class="level3">
 <h3 class="anchored" data-anchor-id="preparing-the-model-for-fitting">Preparing the model for fitting</h3>
-<p>First, we need to prepare the data. This is going to be a list with all the items found in the .cpp files that are of the type <code>DATA</code> (e.g., <code>DATA_VECTOR</code>). Here, we only have <code>y</code> which is the time series of observed values.</p>
+<p>First, we need to prepare the data. This is going to be a list with all the data items needed in the function. It needs to have the same name as the one we defined in the function, here <code>dataTmb</code>. Here, we only have <code>y</code> which is the time series of observed values.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1"></a>dataTmb <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">y =</span> y)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Second, we need a list with the parameters. Again the names need to match those in the .cpp file. These are the starting values for the parameters. Note that this includes both the parameters and the states.</p>
+<p>Second, we need a list with the parameters. Again the names need to match those in the function. These are the starting values for the parameters. Note that this includes both the parameters and the states.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1"></a>par2pTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">logSdP =</span> <span class="dv">0</span>, <span class="at">logSdO =</span> <span class="dv">0</span>,</span>
-<span id="cb8-2"><a href="#cb8-2"></a>             <span class="at">z=</span><span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(dataTmb<span class="sc">$</span>y)<span class="sc">+</span><span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-2"><a href="#cb8-2"></a>             <span class="at">z =</span> <span class="fu">rep</span>(<span class="dv">0</span>, <span class="fu">length</span>(dataTmb<span class="sc">$</span>y)<span class="sc">+</span><span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>By default all values of <code>par2pTmb</code> will be estimated, but we assume that we know the value of the state at time 0, <span class="math inline">\(z_0 = 0\)</span>. To provide this information, we can create a named list that we will input for the argument <code>map</code> of the function <code>MakeADFun</code> below. The elements of <code>map</code> should have the same name and size as those in <code>par2pTmb</code>, but we only need to specify the elements that we want to manipulate, here <code>par2pTmb$z</code>. To fix a value, we set that value to <code>NA</code>. The values that are estimated should have a different entry and all values should be factors.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a>mapTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">z=</span><span class="fu">as.factor</span>(<span class="fu">c</span>(<span class="cn">NA</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(dataTmb<span class="sc">$</span>y))))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Before we can fit the model, we need to use the function <code>MakeADFun</code> to combine the data, the parameters, and the model and create a function that calculates the negative log likelihood and the gradients.</p>
-<p>To identify our random effects, namely the states, <span class="math inline">\(z_t\)</span>, we set the argument <code>random</code> to equal the name of the parameters that are random effects. The argument <code>DLL</code> identify the compiled C++ function to be linked.</p>
+<p>To identify our random effects, namely the states, <span class="math inline">\(z_t\)</span>, we set the argument <code>random</code> to equal the name of the parameters that are random effects.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1"></a>m2pTmb <span class="ot">&lt;-</span> RTMB<span class="sc">::</span><span class="fu">MakeADFun</span>(toy2p, </span>
 <span id="cb10-2"><a href="#cb10-2"></a>                    <span class="at">parameters =</span> par2pTmb, </span>
@@ -352,12 +352,12 @@ pre.numberSource code
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1"></a>sdr2pTmb <span class="ot">&lt;-</span> <span class="fu">summary</span>(<span class="fu">sdreport</span>(m2pTmb))</span>
 <span id="cb14-2"><a href="#cb14-2"></a><span class="co"># This will have the parameters and states</span></span>
 <span id="cb14-3"><a href="#cb14-3"></a><span class="co"># So we can just print the parameters</span></span>
-<span id="cb14-4"><a href="#cb14-4"></a><span class="fu">cbind</span>(<span class="st">"Simulated"</span> <span class="ot">=</span> <span class="fu">c</span>(sdp, sdo),</span>
-<span id="cb14-5"><a href="#cb14-5"></a>  sdr2pTmb[<span class="fu">c</span>(<span class="st">"sdp"</span>, <span class="st">"sdo"</span>),])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb14-4"><a href="#cb14-4"></a><span class="fu">round</span>(<span class="fu">cbind</span>(<span class="st">"Simulated"</span> <span class="ot">=</span> <span class="fu">c</span>(sdp, sdo),</span>
+<span id="cb14-5"><a href="#cb14-5"></a>  sdr2pTmb[<span class="fu">c</span>(<span class="st">"sdp"</span>, <span class="st">"sdo"</span>),]),<span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>    Simulated  Estimate Std. Error
-sdp       0.1 0.1174192 0.01215134
-sdo       0.1 0.0914208 0.01077956</code></pre>
+<pre><code>    Simulated Estimate Std. Error
+sdp       0.1        1      0.485
+sdo       0.1        1      0.485</code></pre>
 </div>
 </div>
 <p>We can see that the estimates for both the process variation and the observation error are close to their true value of 0.1, with relatively small standard errors (SEs).</p>
@@ -483,7 +483,7 @@ z -0.064181179 0.06723443</code></pre>
 <span id="cb25-21"><a href="#cb25-21"></a><span class="co"># dataPbA$ji &lt;- as.numeric(difftime(allDays[dataPbA$idx],</span></span>
 <span id="cb25-22"><a href="#cb25-22"></a><span class="co">#                                  dataPbA$Time, units="hours"))/24</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package <code>bsam</code> (Jonsen et al.&nbsp;2005). We have done a few changes to the values used in <code>bsam</code>. In particular, the skewness of the t-distribution is undefined when the degree of freedom is <span class="math inline">\(\leq 3\)</span>. We have thus set any degree of freedom values smaller or equal to 3 to 3.00001.</p>
+<p>It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package <code>bsam</code> (Jonsen et al.&nbsp;2005). We have done a few changes to the values used in <code>bsam</code>. In particular, the skewness of the t-distribution is undefined when the degrees of freedom are <span class="math inline">\(\leq 3\)</span>. We have thus set any degrees of freedom values smaller or equal to 3 to 3.00001.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb26"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1"></a>ArgosC <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="at">nrow=</span><span class="dv">6</span>, <span class="at">ncol=</span><span class="dv">4</span>)</span>
 <span id="cb26-2"><a href="#cb26-2"></a><span class="fu">colnames</span>(ArgosC) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"TLon"</span>,<span class="st">"NuLon"</span>,<span class="st">"TLat"</span>,<span class="st">"NuLat"</span>)</span>
@@ -504,14 +504,14 @@ z -0.064181179 0.06723443</code></pre>
 </div>
 <section id="fitting-the-model-and-checking-model-fit" class="level2">
 <h2 class="anchored" data-anchor-id="fitting-the-model-and-checking-model-fit">Fitting the model and checking model fit</h2>
-<section id="create-the-c-code-defining-the-negative-log-likelihood" class="level3">
-<h3 class="anchored" data-anchor-id="create-the-c-code-defining-the-negative-log-likelihood">Create the C++ code defining the negative log-likelihood</h3>
-<p>Again, the first thing we need to do to be able to fit the model in <code>TMB</code> is to create a file that will contain the C++ code to evaluate the negative log-likelihood value of the model. We will name the file <strong>dcrw.cpp</strong>.</p>
+<section id="create-the-function-defining-the-negative-log-likelihood" class="level3">
+<h3 class="anchored" data-anchor-id="create-the-function-defining-the-negative-log-likelihood">Create the function defining the negative log-likelihood</h3>
+<p>Again, the first thing we need to do to be able to fit the model in <code>RTMB</code> is to create the function that evaluates the negative log-likelihood value of the model.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb28"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1"></a>dcrw <span class="ot">&lt;-</span> <span class="cf">function</span>(parms){</span>
 <span id="cb28-2"><a href="#cb28-2"></a>  <span class="co"># Make items within dataPbTmb and parms easily available</span></span>
 <span id="cb28-3"><a href="#cb28-3"></a>  <span class="fu">getAll</span>(dataPbTmb, parms, <span class="at">warn=</span><span class="cn">FALSE</span>)</span>
-<span id="cb28-4"><a href="#cb28-4"></a>  <span class="co"># Tell TMB y is the response variable</span></span>
+<span id="cb28-4"><a href="#cb28-4"></a>  <span class="co"># Tell RTMB y is the response variable</span></span>
 <span id="cb28-5"><a href="#cb28-5"></a>  y <span class="ot">&lt;-</span> <span class="fu">OBS</span>(y)</span>
 <span id="cb28-6"><a href="#cb28-6"></a>  </span>
 <span id="cb28-7"><a href="#cb28-7"></a>  <span class="co"># Transformation of the input parameters to model format</span></span>
@@ -574,7 +574,7 @@ z -0.064181179 0.06723443</code></pre>
 </section>
 <section id="prepare-data-and-set-strating-values-for-parameters" class="level3">
 <h3 class="anchored" data-anchor-id="prepare-data-and-set-strating-values-for-parameters">Prepare data and set strating values for parameters</h3>
-<p>Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by C++. Here we need: 1) the matrix <code>y</code>, which contains the longitude and latitude of the locations; 2) the vector <code>idx</code>, which contains the index that relates the observation at time <span class="math inline">\(i\)</span> to the appropriate state time <span class="math inline">\(t\)</span>; 3) the vector <code>ji</code>, which contains when the observation falls between <span class="math inline">\(t-1\)</span> and <span class="math inline">\(t\)</span>; and 4) the matrix <code>ac</code>, which contains all of the error information for the given location. As a note, we are removing 1 from the index value <code>idx</code> because the index of C++ starts a 0, not 1.</p>
+<p>Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by the functions. Here we need: 1) the matrix <code>y</code>, which contains the longitude and latitude of the locations; 2) the vector <code>idx</code>, which contains the index that relates the observation at time <span class="math inline">\(i\)</span> to the appropriate state time <span class="math inline">\(t\)</span>; 3) the vector <code>ji</code>, which contains when the observation falls between <span class="math inline">\(t-1\)</span> and <span class="math inline">\(t\)</span>; and 4) the matrix <code>ac</code>, which contains all of the error information for the given location.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb29"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1"></a>dataPbTmb <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">y =</span> <span class="fu">cbind</span>(dataPbA<span class="sc">$</span>Lon, dataPbA<span class="sc">$</span>Lat),</span>
 <span id="cb29-2"><a href="#cb29-2"></a>               <span class="at">idx=</span>dataPbA<span class="sc">$</span>idx, <span class="at">ji=</span>dataPbA<span class="sc">$</span>ji, <span class="at">ac=</span>dataPbA<span class="sc">$</span>ac)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -622,7 +622,7 @@ psiLon 4.94389447 0.139052935
 psiLat 1.89293815 0.053486332</code></pre>
 </div>
 </div>
-<p>So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., <span class="math inline">\(\gamma =\)</span> . Interestingly, the process variation is quite different in the latitude and longitude direction. This could be due to the fact that one degree of latitude and one degree of longitude are not necessarily covering equivalent distance. We see also that the correction factors for the longitude and latitude are quite different from one another and might point to the advantage of estimating one for each coordinate.</p>
+<p>So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., <span class="math inline">\(\gamma =\)</span> 0.475. Interestingly, the process variation is quite different in the latitude and longitude direction. This could be due to the fact that one degree of latitude and one degree of longitude are not necessarily covering equivalent distance. We see also that the correction factors for the longitude and latitude are quite different from one another and might point to the advantage of estimating one for each coordinate.</p>
 <p>Now let us look at the state estimates. To extract the state value itself, we use <code>$env$parList()</code>. To extract the standard error, we use the matrix returned by <code>summary(sdreport())</code> above.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb36"><pre class="sourceCode numberSource r numberLines code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1"></a><span class="co"># Get the point value</span></span>
