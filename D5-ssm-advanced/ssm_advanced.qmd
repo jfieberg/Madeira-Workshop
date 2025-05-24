@@ -21,7 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Credits
 
-This tutorial uses materials that was created for the Appendix of the paper Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470.  https://doi.org/10.1002/ecm.1470 Some of the material is taken verbatim. Please refer and cite the paper rather than this code if appropriate.
+This tutorial uses materials that was created for the Appendix of the paper Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470. https://doi.org/10.1002/ecm.1470 Some of the material is taken verbatim. Please refer and cite the paper rather than this code if appropriate.
 
 # Tutorial goals
 
@@ -48,22 +48,17 @@ library(RTMB)
 
 ## Model
 
-We start with a simple state-space model (SSM). This model is not linked to an ecological example; it's just a teaching tool. 
-It is a linear SSM with normal error distributions that consists of two equations for two time series.
+We start with a simple state-space model (SSM). This model is not linked to an ecological example; it's just a teaching tool. It is a linear SSM with normal error distributions that consists of two equations for two time series.
 
-The process equation is:
-\begin{equation}
+The process equation is: \begin{equation}
   z_t = z_{t-1} + \epsilon_t, \;\;\; \epsilon_t \sim \text{N}(0, \sigma_p^2),
   \label{E.toy2p.p} 
-\end{equation}
-where $z_t$ is the state value at time $t$, for $t=1, ..., T$. The states are generally unknown, i.e., cannot be observed directly, and are sometimes referred to as latent states. This equation represents the evolution of the hidden state as a random walk. The equation implies that there is some process variation and is here described by a Normal distribution with standard deviation $\sigma_p$. For simplicity, we set the initial state value to be 0, i.e., $z_0 =0$.
+\end{equation} where $z_t$ is the state value at time $t$, for $t=1, ..., T$. The states are generally unknown, i.e., cannot be observed directly, and are sometimes referred to as latent states. This equation represents the evolution of the hidden state as a random walk. The equation implies that there is some process variation and is here described by a Normal distribution with standard deviation $\sigma_p$. For simplicity, we set the initial state value to be 0, i.e., $z_0 =0$.
 
-The observation equation is:
-\begin{equation}
+The observation equation is: \begin{equation}
   y_t = z_{t} + \eta_t, \;\;\; \eta_t \sim \text{N}(0, \sigma_o^2),
   \label{E.toy2p.o}
-\end{equation}
-where $y_t$ is the observation at time $t$, for $t=1, ..., T$. This equation links the observation at time $t$ to the underlying state at that time. The equation implies that there are observation error and, here, is described by a Normal distribution with standard deviation $\sigma_o$.
+\end{equation} where $y_t$ is the observation at time $t$, for $t=1, ..., T$. This equation links the observation at time $t$ to the underlying state at that time. The equation implies that there are observation error and, here, is described by a Normal distribution with standard deviation $\sigma_o$.
 
 This model has two parameters: $\sigma_o, \sigma_p$.
 
@@ -217,7 +212,7 @@ By default all values of `par2pTmb` will be estimated, but we assume that we kno
 mapTmb <- list(z=as.factor(c(NA,1:length(dataTmb$y))))
 ```
 
-Before we can fit the model, we need to use the function `MakeADFun` to combine the data, the parameters, and the model and create a function that calculates the negative log likelihood and the gradients. 
+Before we can fit the model, we need to use the function `MakeADFun` to combine the data, the parameters, and the model and create a function that calculates the negative log likelihood and the gradients.
 
 To identify our random effects, namely the states, $z_t$, we set the argument `random` to equal the name of the parameters that are random effects.
 
@@ -275,7 +270,7 @@ head(zs2pTmb)
 
 Note that in this case, because we fixed the value of the state at time $t=0$, the first method, which looks at the predicted values, only returns state values for $t>0$.
 
-We can use the SEs to calculate the 95\% confidence intervals.
+We can use the SEs to calculate the 95% confidence intervals.
 
 ```{r tmbCI, attr.source = ".numberLines", tidy=FALSE}
 zsCIl2pTmb <- zsSe2pTmb[,1] + 
@@ -306,12 +301,11 @@ legend("top",
        horiz=TRUE, bty="n", cex=0.9)
 ```
 
-
 # Fitting a movement state-space model with `RTMB`.
 
 # State-space model from Argos movement data: a polar bear example
 
-Using the data set available through Dryad Auger-Méthé and Derocher (2021) doi:10.5061/dryad.4qrfj6q96, we will explore a classic state-space model for Argos movement data, which is highly error prone. 
+Using the data set available through Dryad Auger-Méthé and Derocher (2021) doi:10.5061/dryad.4qrfj6q96, we will explore a classic state-space model for Argos movement data, which is highly error prone.
 
 Let us load the Argos data.
 
@@ -415,7 +409,7 @@ dcrw <- function(parms){
   # We are assuming independence between coordinates
   # Thus using two univariate normals
   # Start with lon, lat
-  nll <- sum(dnorm(z[2,], mean = z[1,], sd = c(sdLon, sdLat), log=TRUE))
+  nll <- -sum(dnorm(z[2,], mean = z[1,], sd = c(sdLon, sdLat), log=TRUE))
   
   # nll contribution of the process equation after the 2nd time step
   for(i in 3:nrow(z)){
@@ -457,9 +451,7 @@ dcrw <- function(parms){
 
 ```
 
-
-
-### Prepare data and set strating values for parameters
+### Prepare data and set starting values for parameters
 
 Then, we need to prepare the data, by which we mean create one list that contains all of the data elements needed by the functions. Here we need: 1) the matrix `y`, which contains the longitude and latitude of the locations; 2) the vector `idx`, which contains the index that relates the observation at time $i$ to the appropriate state time $t$; 3) the vector `ji`, which contains when the observation falls between $t-1$ and $t$; and 4) the matrix `ac`, which contains all of the error information for the given location.
 
@@ -507,10 +499,7 @@ parestPbTmb <- summary(sdreport(mPbTmb))
 parestPbTmb[c("gamma", "sdLon", "sdLat", "psiLon", "psiLat"),]
 ```
 
-So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., $\gamma =$ `r round(parestPbTmb["gamma",1],3)`.
-Interestingly, the process variation is quite different in the latitude and longitude direction.
-This could be due to the fact that one degree of latitude and one degree of longitude are not necessarily covering equivalent distance.
-We see also that the correction factors for the longitude and latitude are quite different from one another and might point to the advantage of estimating one for each coordinate.
+So it appears that the movement of this bear is only partially dependent on the movement from the previous step, i.e., $\gamma =$ `r round(parestPbTmb["gamma",1],3)`. Interestingly, the process variation is quite different in the latitude and longitude direction. This could be due to the fact that one degree of latitude and one degree of longitude are not necessarily covering equivalent distance. We see also that the correction factors for the longitude and latitude are quite different from one another and might point to the advantage of estimating one for each coordinate.
 
 Now let us look at the state estimates. To extract the state value itself, we use `$env$parList()`. To extract the standard error, we use the matrix returned by `summary(sdreport())` above.
 
@@ -545,6 +534,6 @@ In Appendix S1 of Auger-Méthé et al. 2021, we compare the estimated locations 
 
 Auger-Méthé M, Derocher AE (2021) Argos and GPS data for a polar bear track, Dryad, Dataset, https://doi.org/10.5061/dryad.4qrfj6q96
 
-Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470.  https://doi.org/10.1002/ecm.1470
+Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA, Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G, Thomas L (2021) A guide to state–space modeling of ecological time series. Ecological Monographs 91(4):e01470. https://doi.org/10.1002/ecm.1470
 
 Jonsen ID, Mills Flemming J, Myers RA (2005) Robust state-space modeling of animal movement data. Ecology 86:2874-2880
