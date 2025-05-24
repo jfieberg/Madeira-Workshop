@@ -1,7 +1,6 @@
 ---
 title: "Building state-space models with RTMB"
 format: html
-editor: visual
 ---
 
 <!-- To be able to have continuous line numbers -->
@@ -50,15 +49,23 @@ library(RTMB)
 
 We start with a simple state-space model (SSM). This model is not linked to an ecological example; it's just a teaching tool. It is a linear SSM with normal error distributions that consists of two equations for two time series.
 
-The process equation is: \begin{equation}
+The process equation is: 
+
+\begin{equation}
   z_t = z_{t-1} + \epsilon_t, \;\;\; \epsilon_t \sim \text{N}(0, \sigma_p^2),
   \label{E.toy2p.p} 
-\end{equation} where $z_t$ is the state value at time $t$, for $t=1, ..., T$. The states are generally unknown, i.e., cannot be observed directly, and are sometimes referred to as latent states. This equation represents the evolution of the hidden state as a random walk. The equation implies that there is some process variation and is here described by a Normal distribution with standard deviation $\sigma_p$. For simplicity, we set the initial state value to be 0, i.e., $z_0 =0$.
+\end{equation} 
 
-The observation equation is: \begin{equation}
+where $z_t$ is the state value at time $t$, for $t=1, ..., T$. The states are generally unknown, i.e., cannot be observed directly, and are sometimes referred to as latent states. This equation represents the evolution of the hidden state as a random walk. The equation implies that there is some process variation and is here described by a Normal distribution with standard deviation $\sigma_p$. For simplicity, we set the initial state value to be 0, i.e., $z_0 =0$.
+
+The observation equation is: 
+
+\begin{equation}
   y_t = z_{t} + \eta_t, \;\;\; \eta_t \sim \text{N}(0, \sigma_o^2),
   \label{E.toy2p.o}
-\end{equation} where $y_t$ is the observation at time $t$, for $t=1, ..., T$. This equation links the observation at time $t$ to the underlying state at that time. The equation implies that there are observation error and, here, is described by a Normal distribution with standard deviation $\sigma_o$.
+\end{equation} 
+
+where $y_t$ is the observation at time $t$, for $t=1, ..., T$. This equation links the observation at time $t$ to the underlying state at that time. The equation implies that there are observation error and, here, is described by a Normal distribution with standard deviation $\sigma_o$.
 
 This model has two parameters: $\sigma_o, \sigma_p$.
 
@@ -229,7 +236,7 @@ m2pTmb <- RTMB::MakeADFun(toy2p,
 
 We fit the model using `nlminb`, which is a base R optimizer, but we input the object returned by `MakeADFun`.
 
-```{r tmbOpt, attr.source = ".numberLines", tidy=FALSE, cache=TRUE}
+```{r tmbOpt, attr.source = ".numberLines", tidy=FALSE}
 f2pTmb <- nlminb(start = m2pTmb$par, # Initial values for the parameters
                  objective = m2pTmb$fn, # Function to be minimized
                  gradient = m2pTmb$gr) # Gradient of the objective
@@ -259,7 +266,7 @@ We can see that the estimates for both the process variation and the observation
 
 We can get the smoothed state values with the `sdreport` function as above and this will give you the SEs for these states. If you are only interested in the state values (not theis SEs), you can also extract them directly from the model object.
 
-```{r toy.states.est, attr.source = ".numberLines", tidy=FALSE, cache=TRUE}
+```{r toy.states.est, attr.source = ".numberLines", tidy=FALSE}
 # To get the point estimate and the SE of the states
 zsSe2pTmb <- sdr2pTmb[row.names(sdr2pTmb)=="z",]
 head(zsSe2pTmb)
@@ -349,11 +356,8 @@ allDays <- as.POSIXlt(paste(allDays, "17:00"), tz="UTC")
 # +1 because the it's the proportion of time between t-1 and t, we link with t.
 dataPbA$idx <- findInterval(dataPbA$Time,allDays) + 1
 # Checking how far from the z_t y is
-dataPbA$ji <- as.numeric(24-difftime(allDays[dataPbA$idx],
+dataPbA$ji <- as.numeric(difftime(allDays[dataPbA$idx],
                                  dataPbA$Time, units="hours"))/24
-
-# dataPbA$ji <- as.numeric(difftime(allDays[dataPbA$idx],
-#                                  dataPbA$Time, units="hours"))/24
 ```
 
 It is customary to use error data to help the estimation process. Here we create a matrix with the error values, these values are based on those used in the package `bsam` (Jonsen et al. 2005). We have done a few changes to the values used in `bsam`. In particular, the skewness of the t-distribution is undefined when the degrees of freedom are $\leq 3$. We have thus set any degrees of freedom values smaller or equal to 3 to 3.00001.
@@ -487,14 +491,14 @@ mPbTmb <- MakeADFun(dcrw, parameters = parPbTmb,
 
 Using the created object, we can find the MLE with `nlminb`.
 
-```{r polar.bear.nlminb, attr.source = ".numberLines", cache=TRUE}
+```{r polar.bear.nlminb, attr.source = ".numberLines"}
 fPbTmb <- nlminb(mPbTmb$par, mPbTmb$fn, mPbTmb$gr)
 fPbTmb$message
 ```
 
 Looks like it converged, so let us now look at the estimated parameters using `sdreport`.
 
-```{r pbTMBpar, attr.source = ".numberLines", cache=TRUE}
+```{r pbTMBpar, attr.source = ".numberLines"}
 parestPbTmb <- summary(sdreport(mPbTmb))
 parestPbTmb[c("gamma", "sdLon", "sdLat", "psiLon", "psiLat"),]
 ```
@@ -514,14 +518,14 @@ zsvPbTmb <- cbind(zsvPbTmb[1:(nrow(zsvPbTmb)/2),2],
 
 Let's plot the results.
 
-```{r polar.bear.plot.states, attr.source = ".numberLines", cache=TRUE}
+```{r polar.bear.plot.states, attr.source = ".numberLines"}
 plot(zsPbTmb, 
      pch=19, cex=0.7, col = "red", ty="o", las=1,
      xlab="Longitude", ylab="Latitude")
 points(dataPbA[,c("Lon", "Lat")], 
        pch=3, cex=0.7, col = "blue", ty="o", lty=3)
 legend("top",
-       legend = c("Sim. Obs.", "Estimated latent states"),
+       legend = c("Obs.", "Estimated latent states"),
        pch = c(3, 19),
        col = c("blue", "red"),
        lty = c(3, 1),
