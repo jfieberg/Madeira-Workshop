@@ -8,7 +8,6 @@
 ###########################################################################
 
 library(ctmm)
-library(ggplot2)
 library(here)
 
 # Load pre-run objects:
@@ -30,6 +29,7 @@ head(data_gazelle)
 plot(data_buffalo, col = "red", lwd = 3)
 plot(data_gazelle, col = "blue", lwd = 3)
 
+# Absolute sample size:
 nrow(data_buffalo)
 nrow(data_gazelle)
 
@@ -116,14 +116,13 @@ abline(h = 2 %#% "hours", col = "red")
 "minutes" %#% min(diff(data_buffalo$t))
 
 # Calculate wAKDE:
-
 start_time <- Sys.time()
 AKDE1_weighted <- akde(data_buffalo, fit1[[1]], weights = TRUE)
 Sys.time() - start_time # Time difference of 1.298815 mins
 
 summary(AKDE1_weighted)$CI # 95% home range area (weighted)
 
-ext <- extent(list(AKDE1_ML, AKDE1, AKDE1_weighted), level = 0.95)
+ext <- extent(list(AKDE1, AKDE1_weighted), level = 0.95)
 
 # Plotting pHREML (with and without weights) side-by-side:
 par(mfrow = c(1,2))
@@ -206,13 +205,13 @@ for(i in seq_along(buffalo)) {
 }
 Sys.time() - start_time
 
+data(buffalo)
 # Calculate AKDEs on a consistent grid:
 hrList <- akde(buffalo, fitList, trace = 2)
 
 # Plot AKDEs:
 pal <- color(hrList, by = "individual")
 plot(hrList,
-     col.DF = pal,
      col.level = pal,
      col.grid = NA,
      level = NA)
@@ -220,7 +219,7 @@ plot(hrList,
 # What is the mean home range area of an average individual:
 
 meta(hrList,
-     col = c(pal, "black"), 
+     # col = c(pal, "black"), 
      verbose = TRUE,
      sort = TRUE) 
 

@@ -30,6 +30,8 @@ R <- list(tree = treecover)
 
 # 2. Fit an autocorrelated movement model: --------------------------------
 
+load(here::here("D4-ctmm", "data", "fit_tapir-iso.rda"))
+
 # Estimate starting model (isotropic, includes error):
 guess <- ctmm.guess(dat,
                     CTMM = ctmm(error = TRUE,
@@ -42,7 +44,6 @@ summary(fit)
 
 # Save fitted model:
 # save(fit, file = here::here("data", "fit_tapir-iso.rda"))
-load(here::here("D4-ctmm", "data", "fit_tapir-iso.rda"))
 
 # 3. Run Autocorrelated Kernel Density Estimate (AKDE): -------------------
 
@@ -129,3 +130,5 @@ plot(dat, error = 2, R = SUIT[["est"]],
 # Re-estimate AKDE while incorporating RSF
 RAKDE <- akde(dat, RSF, R = R, weights = TRUE)
 plot(dat, error = 2, UD = RAKDE, col.grid = NA, main = "iRSF-AKDE")
+
+

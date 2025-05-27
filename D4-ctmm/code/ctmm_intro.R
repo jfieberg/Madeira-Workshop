@@ -9,6 +9,7 @@
 
 library(ctmm)
 library(here)
+library(ggplot2)
 
 # Help files & vignettes:
 help(package = "ctmm")
@@ -50,9 +51,6 @@ class(buffalo)
 # Number of individuals:
 length(buffalo)
 
-class(buffalo[[1]])
-head(buffalo[[1]])
-
 # Names of individuals:
 names(buffalo)
 
@@ -84,12 +82,14 @@ projection(buffalo) <- median(buffalo)
 projection(buffalo)
 
 # now North=up, which is fine for this dataset
+pal <- color(buffalo, by = "individual")
 plot(buffalo, col = pal, main = "Azimuthal-equidistant projection")
 compass()
 
 # Variogram: --------------------------------------------------------------
 
 names(buffalo)
+# Selecting the first individual for this example:
 data_buffalo <- buffalo$Cilla # selecting buffalo named Cilla
 
 # Plot telemetry object:
@@ -102,7 +102,7 @@ plot(data_buffalo, col = pal)
 
 ggplot(data_buffalo) +
   geom_point(aes(x, y, color = timestamp)) +
-  scale_color_viridis("Timestamp", trans = "time")
+  scale_color_continuous("Timestamp", trans = "time")
 
 # Calculate a variogram object from the telemetry object:
 help("variogram")

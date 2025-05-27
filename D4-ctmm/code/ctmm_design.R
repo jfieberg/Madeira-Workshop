@@ -9,8 +9,9 @@
 
 browseURL("https://github.com/ecoisilva/movedesign")
 
-# install.packages("remotes")
-# remotes::install_github("ecoisilva/movedesign", force = TRUE)
+install.packages("gfonts")
+install.packages("remotes")
+remotes::install_github("ecoisilva/movedesign", force = TRUE)
 
 library(movedesign)
 movedesign::run_app() # start the app
