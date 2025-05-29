@@ -71,7 +71,7 @@ dat[1:30,]
 
 TMBStruc = glmmTMB(Loc ~ -1 + STAU1 + REST1 + Sohlenbrei +  
                      Breaks_Dis +  (1|str_ID) + 
-                     (0 + STAU1 | ANIMAL_ID) + 
+                     (0  + STAU1 | ANIMAL_ID) + 
                      (0 + REST1 | ANIMAL_ID)   + 
                      (0 + Sohlenbrei | ANIMAL_ID), 
                    family=poisson, data=dat, doFit=FALSE) 

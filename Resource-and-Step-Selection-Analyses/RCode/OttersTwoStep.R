@@ -133,9 +133,9 @@ dat.n <- dat.n %>%
 
 dat.n <- dat.n %>% 
   mutate(
-    ssf = lapply(data, function(.x) 
+    ssf = lapply(data, function(x) 
                 clogit(Loc ~ STAU1 + REST1 + Sohlenbrei +  Breaks_Dis + strata(str_ID), 
-                       data = .x) %>% tidy()))
+                       data = x) %>% tidy()))
 dat.n
 coefs1 <- dat.n %>% dplyr::select(NA_ANIMAL, ssf) %>% unnest(cols = ssf)
 
@@ -154,8 +154,8 @@ plot(coefs0$estimate, coefs1$estimate)
 se<-function(x){sd(x)/sqrt(length(x))}
 statsonstats<- coefs1 %>% group_by(term) %>% 
   summarize(mean=mean(estimate), se=se(estimate), n = n()) %>%
-  mutate(lci = mean + qt(0.975, df = n-1)*se,
-         uci = mean + qt(0.025, df = n-1)*se) %>%
+  mutate(uci = mean + qt(0.975, df = n-1)*se,
+         lci = mean + qt(0.025, df = n-1)*se) %>%
   mutate(method = "t")
 statsonstats
 
