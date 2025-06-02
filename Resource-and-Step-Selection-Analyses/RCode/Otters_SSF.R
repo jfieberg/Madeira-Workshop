@@ -15,6 +15,7 @@ library(survival)
 library(TwoStepCLogit)
 library(glmmTMB)
 library(tictoc)
+library(here)
 options(width=160)# setting output width in html report
 dat <-  read.csv(here("Resource-and-Step-Selection-Analyses/Data", "d_otter.csv"))
 
